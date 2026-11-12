@@ -3,23 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#315d44">
 <title>ARUNIKA</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash"></div>
+
 <section id="login" hidden>
-  <div class="brand"><div class="logo">A</div><h1>ARUNIKA</h1><p>Manage Better. Grow Further.</p></div>
-  <form id="f">
-    <input id="em" type="email" placeholder="Email" required autocomplete="username">
-    <input id="pw" type="password" placeholder="Password" required autocomplete="current-password">
-    <div id="err"></div>
-    <button class="btn">Masuk</button>
-  </form>
+  <div class="lw">
+    <img src="logo.png" class="biglogo" alt="Logo">
+    <form id="f">
+      <input id="em" type="email" placeholder="Email" required autocomplete="username">
+      <input id="pw" type="password" placeholder="Kata sandi" required autocomplete="current-password">
+      <div id="err"></div>
+      <button class="btn">Masuk</button>
+    </form>
+  </div>
 </section>
 
 <section id="app" hidden>
   <header>
-    <div><b class="hb">ARUNIKA</b><small id="toko"></small></div>
+    <div class="hl"><img src="logo.png" class="hlogo" alt=""><b id="toko"></b></div>
     <button id="prof" aria-label="Profil"><span id="av"></span></button>
   </header>
   <main>
@@ -44,7 +53,34 @@
     <input id="pn" maxlength="40">
     <p class="info" id="pi"></p>
     <button class="btn" id="spn">Simpan</button>
+    <details class="pw"><summary>Ganti kata sandi</summary>
+      <label>Kata sandi lama</label><input id="pw0" type="password" autocomplete="current-password">
+      <label>Kata sandi baru (minimal 8 karakter)</label><input id="pw1" type="password" autocomplete="new-password">
+      <label>Ulangi kata sandi baru</label><input id="pw2" type="password" autocomplete="new-password">
+      <button class="btn" id="spw">Ubah kata sandi</button>
+    </details>
     <button class="out" id="keluar">Keluar</button>
+  </div>
+</div>
+
+<div id="lap" hidden>
+  <div class="sh">
+    <button class="x" aria-label="Tutup">&times;</button>
+    <h3>Unduh laporan</h3>
+    <label>Jenis laporan</label>
+    <select id="lj">
+      <option value="ringkasan">Ringkasan (pemasukan, pengeluaran, laba)</option>
+      <option value="penjualan">Penjualan</option>
+      <option value="pembelian">Pembelian bahan baku</option>
+      <option value="stok">Stok bahan dan produk</option>
+    </select>
+    <div id="lper">
+      <label>Periode</label>
+      <select id="lp"><option value="hari">Hari ini</option><option value="7">7 hari terakhir</option><option value="bulan">Bulan ini</option><option value="kustom">Pilih tanggal</option></select>
+      <div id="lrg" hidden><input id="ld1" type="date"><input id="ld2" type="date"></div>
+    </div>
+    <button class="btn wa" id="bwa">Bagikan ke WhatsApp (PDF)</button>
+    <div class="dua"><button class="btn2" id="bpdf">Unduh PDF</button><button class="btn2" id="bxls">Unduh Excel</button></div>
   </div>
 </div>
 
