@@ -40,7 +40,7 @@ async function enter() {
 }
 
 let cur = 'home';
-const HALAMAN = { home, beli };
+const HALAMAN = { home, beli, produksi };
 const buka = (p, label) => { cur = p; (HALAMAN[p] || (() => soon(label)))(); };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
@@ -156,10 +156,10 @@ async function beli() {
 
   $('#view').innerHTML = form + `
     <div class="box"><h3>Stok bahan</h3>
-      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b>${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
+      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b>${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
     </div>
     <div class="box"><h3>Pembelian terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
+      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
     </div>`;
   if (admin) return;
 
@@ -176,5 +176,77 @@ async function beli() {
     const { error } = await db.from('bahan').insert({ nama, satuan, tipe: $('#nt').value });
     if (error) return toast(error.message);
     toast('Bahan ditambahkan'); beli();
+  };
+}
+
+// ===== Halaman PRODUKSI (produk, resep, catat produksi) =====
+async function produksi() {
+  charts.forEach(c => c.destroy()); charts = [];
+  const admin = me.role === 'admin';
+  const f = (t, k, ord, extra) => {
+    let x = db.from(t).select(k);
+    if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter);
+    if (extra) x = x.eq(extra[0], extra[1]);
+    return x.order(ord.c, ord.opt || {});
+  };
+  const [pr, bh, rs, hs] = await Promise.all([
+    f('produk', 'id,nama,harga_jual,stok,hpp_rata', { c: 'nama' }),
+    f('bahan', 'id,nama,satuan', { c: 'nama' }, ['tipe', 'otomatis']),
+    f('resep', 'produk_id,takaran,bahan(nama,satuan)', { c: 'produk_id' }),
+    f('produksi', 'tanggal,qty,hpp_satuan,produk(nama)', { c: 'created_at', opt: { ascending: false } }).limit(10)
+  ]);
+  const produk = pr.data || [], bahan = bh.data || [], resep = rs.data || [], riwayat = hs.data || [];
+  const optP = produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join('') : '<option value="">Tambah produk dulu</option>';
+  const optB = bahan.length ? bahan.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.satuan)})</option>`).join('') : '<option value="">Belum ada bahan tipe Otomatis</option>';
+
+  const forms = admin
+    ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
+    : `<div class="box"><h3>Catat produksi</h3>
+        <select id="pp">${optP}</select>
+        <input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
+        <input id="pd" type="date" value="${iso(new Date())}">
+        <button class="btn" id="sP">Simpan produksi</button></div>
+      <div class="box"><h3>Tambah produk</h3>
+        <input id="np" placeholder="Nama produk">
+        <input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
+        <button class="btn" id="sNP">Tambah produk</button></div>
+      <div class="box"><h3>Isi resep (per 1 produk)</h3>
+        <select id="rp">${optP}</select>
+        <select id="rb">${optB}</select>
+        <input id="rt" type="number" inputmode="decimal" step="any" min="0" placeholder="Takaran bahan">
+        <button class="btn" id="sR">Simpan resep</button></div>`;
+
+  $('#view').innerHTML = forms + `
+    <div class="box"><h3>Produk dan resep</h3>
+      ${produk.length ? produk.map(x => {
+        const r = resep.filter(y => y.produk_id === x.id).map(y => `${y.takaran} ${esc(y.bahan?.satuan)} ${esc(y.bahan?.nama)}`).join(', ');
+        return `<div class="row"><span>${esc(x.nama)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
+      }).join('') : '<div class="kosong">Belum ada produk.</div>'}
+    </div>
+    <div class="box"><h3>Produksi terakhir</h3>
+      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · modal ${rp(x.hpp_satuan)}/pcs</small></span><b>${x.qty}</b></div>`).join('') : '<div class="kosong">Belum ada produksi.</div>'}
+    </div>`;
+  if (admin) return;
+
+  $('#sP').onclick = async () => {
+    const qty = +$('#pq').value;
+    if (!$('#pp').value || qty <= 0) return toast('Pilih produk dan isi jumlah');
+    const { error } = await db.rpc('catat_produksi', { p_produk: $('#pp').value, p_qty: qty, p_tanggal: $('#pd').value });
+    if (error) return toast(error.message);
+    toast('Produksi tersimpan'); produksi();
+  };
+  $('#sNP').onclick = async () => {
+    const nama = $('#np').value.trim();
+    if (!nama || $('#nh').value === '') return toast('Isi nama dan harga jual');
+    const { error } = await db.from('produk').insert({ nama, harga_jual: +$('#nh').value });
+    if (error) return toast(error.message);
+    toast('Produk ditambahkan'); produksi();
+  };
+  $('#sR').onclick = async () => {
+    const t = +$('#rt').value;
+    if (!$('#rp').value || !$('#rb').value || t <= 0) return toast('Pilih produk, bahan, dan isi takaran');
+    const { error } = await db.from('resep').upsert({ produk_id: $('#rp').value, bahan_id: $('#rb').value, takaran: t }, { onConflict: 'produk_id,bahan_id' });
+    if (error) return toast(error.message);
+    toast('Resep tersimpan'); produksi();
   };
 }
