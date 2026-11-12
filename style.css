@@ -83,3 +83,16 @@ nav button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width
 nav button span{line-height:1}
 nav button.on{background:#3D5C42;box-shadow:0 3px 10px rgba(61,92,66,.35)}
 nav button.on svg{stroke-width:2.2}
+
+/* ===== Profil ===== */
+.toast{z-index:40}
+#prof{width:42px;height:42px;padding:0;border:2px solid rgba(255,255,255,.7);border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2)}
+#av,.avbig{background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+#av{width:100%;height:100%;font-size:18px}
+.avbig{width:96px;height:96px;margin:6px auto 0;border-radius:50%;background-color:#6F9276;font-size:38px}
+#sheet{position:fixed;inset:0;background:rgba(31,45,34,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sh{position:relative;background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom,0px))}
+#tutup{position:absolute;right:12px;top:6px;border:0;background:none;font-size:30px;color:var(--mu)}
+.ganti{text-align:center;color:#3D5C42;font-size:13px;margin:10px 0 12px;cursor:pointer}
+.info{color:var(--mu);font-size:12px;margin:0 0 12px}
+.out{width:100%;margin-top:10px;padding:13px;border-radius:12px;border:1.5px solid #BF5240;background:#fff;color:#BF5240;font-weight:600;font-size:15px}
