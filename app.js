@@ -18,7 +18,7 @@ $('#f').onsubmit = async e => {
   if (error) $('#err').textContent = 'Email atau password salah';
   else enter();
 };
-$('#out').onclick = async () => { await db.auth.signOut(); show('login'); };
+$('#keluar').onclick = async () => { await db.auth.signOut(); $('#sheet').hidden = true; show('login'); };
 
 async function enter() {
   const { data: { user } } = await db.auth.getUser();
@@ -26,6 +26,7 @@ async function enter() {
   if (!data) { $('#err').textContent = 'Profil akun belum siap, hubungi admin'; return show('login'); }
   me = data;
   $('#toko').textContent = me.nama_toko;
+  tampilAvatar();
   show('app');
   if (me.role === 'admin') {
     const { data: t } = await db.from('profiles').select('id,nama_toko').eq('role', 'toko').order('nama_toko');
@@ -381,3 +382,49 @@ async function stok() {
     toast('Penyesuaian tersimpan'); stok();
   };
 }
+
+// ===== PROFIL (nama toko, foto, keluar) =====
+function tampilAvatar() {
+  ['#av', '#avb'].forEach(q => {
+    const e = $(q);
+    e.style.backgroundImage = me.avatar ? `url(${me.avatar})` : '';
+    e.textContent = me.avatar ? '' : (me.nama_toko || 'A')[0].toUpperCase();
+  });
+}
+function kecil(file) { // potong persegi 160px agar ringan disimpan
+  return new Promise((ok, gagal) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 160;
+      const s = Math.min(img.width, img.height);
+      c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 160, 160);
+      URL.revokeObjectURL(img.src); ok(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = gagal; img.src = URL.createObjectURL(file);
+  });
+}
+$('#prof').onclick = () => {
+  $('#pn').value = me.nama_toko;
+  $('#pi').textContent = me.role === 'admin' ? 'Akun admin' : 'Akun toko';
+  $('#sheet').hidden = false;
+};
+$('#tutup').onclick = () => { $('#sheet').hidden = true; };
+$('#sheet').onclick = e => { if (e.target.id === 'sheet') e.target.hidden = true; };
+$('#spn').onclick = async () => {
+  const nama = $('#pn').value.trim();
+  if (!nama) return toast('Nama toko tidak boleh kosong');
+  const { error } = await db.from('profiles').update({ nama_toko: nama }).eq('id', me.id);
+  if (error) return toast(error.message);
+  me.nama_toko = nama; $('#toko').textContent = nama; tampilAvatar();
+  $('#sheet').hidden = true; toast('Profil disimpan');
+};
+$('#fto').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const url = await kecil(f);
+    const { error } = await db.from('profiles').update({ avatar: url }).eq('id', me.id);
+    if (error) return toast(error.message);
+    me.avatar = url; tampilAvatar(); toast('Foto diperbarui');
+  } catch { toast('Foto tidak bisa dibaca'); }
+  e.target.value = '';
+};
