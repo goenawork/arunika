@@ -24,7 +24,7 @@ async function enter() {
   const { data: { user } } = await db.auth.getUser();
   const { data } = await db.from('profiles').select('*').eq('id', user.id).single();
   if (!data) { $('#err').textContent = 'Profil akun belum siap, hubungi admin'; return show('login'); }
-  me = data;
+  me = data; me.email = user.email;
   $('#toko').textContent = me.nama_toko;
   tampilAvatar();
   show('app');
@@ -50,69 +50,6 @@ function soon(nama) {
   $('#view').innerHTML = `<div class="soon"><b>${esc(nama)}</b><br>Halaman ini dibangun di tahap berikutnya.</div>`;
 }
 
-async function home() {
-  const hari = iso(new Date());
-  const awal = iso(new Date(Date.now() - 6 * 864e5));
-  const q = (t, kolom, tgl) => {
-    let x = db.from(t).select(kolom);
-    if (tgl) x = x.gte('tanggal', awal);
-    return tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x;
-  };
-  const [j, b, p] = await Promise.all([
-    q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode', true),
-    q('pembelian', 'tanggal,total_harga,metode', true),
-    q('produk', 'nama,stok')
-  ]);
-  const jual = j.data || [], beli = b.data || [], produk = p.data || [];
-  const jH = jual.filter(r => r.tanggal === hari), bH = beli.filter(r => r.tanggal === hari);
-  const sum = (a, f) => a.reduce((s, r) => s + f(r), 0);
-  const masuk = sum(jH, r => r.qty * r.harga_satuan);
-  const keluar = sum(bH, r => r.total_harga);
-  const laba = sum(jH, r => r.qty * (r.harga_satuan - r.hpp_satuan));
-  const perMetode = METODE.map(m => ({
-    m,
-    masuk: sum(jH.filter(r => r.metode === m), r => r.qty * r.harga_satuan),
-    keluar: sum(bH.filter(r => r.metode === m), r => r.total_harga)
-  }));
-  const hari7 = [...Array(7)].map((_, i) => iso(new Date(Date.now() - (6 - i) * 864e5)));
-
-  $('#view').innerHTML = `
-    <p class="tgl">${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p>
-    <div class="grid">
-      <div class="card in"><small>Pemasukan hari ini</small><b>${rp(masuk)}</b></div>
-      <div class="card ${keluar > masuk ? 'warn' : 'out'}"><small>Pengeluaran hari ini</small><b>${rp(keluar)}</b>${keluar > masuk ? '<span class="flag">Lebih besar dari pemasukan</span>' : ''}</div>
-      <div class="card ${masuk - keluar < 0 ? 'bad' : 'hi'}"><small>Selisih</small><b>${rp(masuk - keluar)}</b>${masuk - keluar < 0 ? '<span class="flag">Defisit hari ini</span>' : ''}</div>
-      <div class="card ${laba < 0 ? 'bad' : 'hi'}"><small>Laba penjualan</small><b>${rp(laba)}</b>${laba < 0 ? '<span class="flag">Penjualan di bawah modal</span>' : ''}</div>
-    </div>
-    <div class="box"><h3>Per metode pembayaran (hari ini)</h3>
-      <canvas id="c1" height="170"></canvas>
-      ${perMetode.map(x => `<div class="row"><span>${x.m.toUpperCase()}</span><span>+${rp(x.masuk)} / -${rp(x.keluar)}</span></div>`).join('')}
-    </div>
-    <div class="box"><h3>7 hari terakhir</h3><canvas id="c2" height="200"></canvas></div>
-    <div class="box"><h3>Sisa produk belum terjual</h3>
-      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
-    </div>`;
-
-  charts.forEach(c => c.destroy());
-  charts = [
-    new Chart($('#c1'), {
-      type: 'doughnut',
-      data: { labels: ['Cash', 'QRIS', 'Transfer'], datasets: [{ data: perMetode.map(x => x.masuk), backgroundColor: HIJAU, borderWidth: 0 }] },
-      options: { plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
-    }),
-    new Chart($('#c2'), {
-      type: 'bar',
-      data: {
-        labels: hari7.map(d => d.slice(8) + '/' + d.slice(5, 7)),
-        datasets: [
-          { label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 6, data: hari7.map(d => sum(jual.filter(r => r.tanggal === d), r => r.qty * r.harga_satuan)) },
-          { label: 'Pengeluaran', backgroundColor: '#6F9276', borderRadius: 6, data: hari7.map(d => sum(beli.filter(r => r.tanggal === d), r => r.total_harga)) }
-        ]
-      },
-      options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } }
-    })
-  ];
-}
 
 (async () => {
   const { data: { session } } = await db.auth.getSession();
@@ -428,3 +365,219 @@ $('#fto').onchange = async e => {
   } catch { toast('Foto tidak bisa dibaca'); }
   e.target.value = '';
 };
+
+// ===== BERANDA (dashboard) =====
+const WARNA_M = ['#3D5C42', '#8DBF9A', '#E8B64A'], NAMA_M = ['Cash', 'QRIS', 'Transfer'];
+let periodeGrafik = 'hari';
+function rentangDash(p) {
+  const t = new Date(), e = iso(t);
+  if (p === 'hari') return [e, e];
+  if (p === 'minggu') return [iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (t.getDay() + 6) % 7)), e];
+  return [iso(new Date(t.getFullYear(), t.getMonth(), 1)), e];
+}
+async function home() {
+  const hari = iso(new Date());
+  const awal = [rentangDash('bulan')[0], rentangDash('minggu')[0]].sort()[0];
+  const q = (t, k) => { const x = db.from(t).select(k).gte('tanggal', awal); return tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x; };
+  let qp = db.from('produk').select('nama,stok'); if (tokoFilter !== 'all') qp = qp.eq('toko_id', tokoFilter);
+  const [j, b, p] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode'), q('pembelian', 'tanggal,total_harga,metode'), qp]);
+  const jual = j.data || [], beli = b.data || [], produk = p.data || [];
+  const sum = (a, f) => a.reduce((s, r) => s + f(r), 0), masukR = r => r.qty * r.harga_satuan;
+  const jH = jual.filter(r => r.tanggal === hari), bH = beli.filter(r => r.tanggal === hari);
+  const masuk = sum(jH, masukR), keluar = sum(bH, r => r.total_harga), laba = sum(jH, r => r.qty * (r.harga_satuan - r.hpp_satuan));
+  const terjual = sum(jH, r => +r.qty), sisa = sum(produk, r => +r.stok);
+  const kartu = (c, l, v, fl) => `<div class="card ${c}"><small>${l}</small><b>${v}</b>${fl ? `<span class="flag">${fl}</span>` : ''}</div>`;
+  const habis = produk.length && sisa <= 0;
+
+  $('#view').innerHTML = `
+    <div class="bar"><p class="tgl">${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p><button class="lapbtn" id="bl">Laporan</button></div>
+    <div class="grid">
+      ${kartu('in', 'Pemasukan hari ini', rp(masuk))}
+      ${kartu(keluar > masuk ? 'warn' : 'out', 'Pengeluaran hari ini', rp(keluar), keluar > masuk ? 'Lebih besar dari pemasukan' : '')}
+      ${kartu(masuk - keluar < 0 ? 'bad' : 'hi', 'Selisih', rp(masuk - keluar), masuk - keluar < 0 ? 'Defisit hari ini' : '')}
+      ${kartu(laba < 0 ? 'bad' : 'hi', 'Laba penjualan', rp(laba), laba < 0 ? 'Penjualan di bawah modal' : '')}
+      ${kartu('', 'Produk terjual hari ini', +terjual.toFixed(2))}
+      ${kartu(habis ? 'warn' : '', 'Produk tersisa', +sisa.toFixed(2), habis ? 'Stok produk habis' : '')}
+    </div>
+    <div class="box"><div class="hd"><h3>Metode pembayaran</h3>
+      <div class="seg" id="seg">${[['hari', 'Hari ini'], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div></div>
+      <div id="gr"></div></div>
+    <div class="box"><h3>Sisa produk belum terjual</h3>
+      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
+    </div>`;
+
+  const gambar = () => {
+    document.querySelectorAll('#seg button').forEach(x => { x.classList.toggle('on', x.dataset.k === periodeGrafik); x.onclick = () => { periodeGrafik = x.dataset.k; gambar(); }; });
+    const [a, z] = rentangDash(periodeGrafik), ada = r => r.tanggal >= a && r.tanggal <= z;
+    const js = jual.filter(ada), bs = beli.filter(ada);
+    const pm = METODE.map(m => ({ masuk: sum(js.filter(r => r.metode === m), masukR), keluar: sum(bs.filter(r => r.metode === m), r => r.total_harga) }));
+    const tot = sum(pm, x => x.masuk);
+    $('#gr').innerHTML = `<div class="dn"><div class="dc"><canvas id="c1"></canvas></div>
+      <div class="lg">${pm.map((x, i) => `<div><i style="background:${WARNA_M[i]}"></i><span>${NAMA_M[i]}<small>${tot ? Math.round(x.masuk / tot * 100) : 0}%</small></span><b>${rp(x.masuk)}</b></div>`).join('')}</div></div>
+      <h4>Pemasukan vs pengeluaran${periodeGrafik === 'hari' ? ' per metode' : ' per hari'}</h4><canvas id="c2" height="190"></canvas>`;
+    let lb, dm, dk;
+    if (periodeGrafik === 'hari') { lb = NAMA_M; dm = pm.map(x => x.masuk); dk = pm.map(x => x.keluar); }
+    else {
+      const hr = []; for (let d = new Date(a + 'T00:00'); iso(d) <= z; d.setDate(d.getDate() + 1)) hr.push(iso(d));
+      lb = hr.map(d => d.slice(8) + '/' + d.slice(5, 7));
+      dm = hr.map(d => sum(js.filter(r => r.tanggal === d), masukR)); dk = hr.map(d => sum(bs.filter(r => r.tanggal === d), r => r.total_harga));
+    }
+    charts.forEach(c => c.destroy());
+    charts = [
+      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
+      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#E8B64A', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
+    ];
+  };
+  gambar();
+}
+
+// ===== KATA SANDI =====
+$('#spw').onclick = async () => {
+  const a = $('#pw0').value, b = $('#pw1').value, c = $('#pw2').value;
+  if (!a || !b) return toast('Isi kata sandi lama dan baru');
+  if (b.length < 8) return toast('Kata sandi baru minimal 8 karakter');
+  if (b !== c) return toast('Ulangi kata sandi baru dengan sama persis');
+  const { error: e1 } = await db.auth.signInWithPassword({ email: me.email, password: a });
+  if (e1) return toast('Kata sandi lama salah');
+  const { error } = await db.auth.updateUser({ password: b });
+  if (error) return toast(error.message);
+  ['#pw0', '#pw1', '#pw2'].forEach(k => { $(k).value = ''; });
+  toast('Kata sandi berhasil diubah');
+};
+
+// ===== LAPORAN (PDF, Excel, WhatsApp) =====
+const LIB = { pdf: ['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'], xls: ['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'] };
+const muat = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+const fmt = d => new Date(d + 'T00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+const sumA = (a, f) => a.reduce((s, r) => s + f(r), 0);
+
+$('#view').addEventListener('click', e => { if (e.target.closest('#bl')) $('#lap').hidden = false; });
+$('#lap .x').onclick = () => { $('#lap').hidden = true; };
+$('#lap').onclick = e => { if (e.target.id === 'lap') e.target.hidden = true; };
+$('#lp').onchange = () => { $('#lrg').hidden = $('#lp').value !== 'kustom'; };
+$('#lj').onchange = () => { $('#lper').hidden = $('#lj').value === 'stok'; };
+$('#bpdf').onclick = () => aksi('pdf'); $('#bxls').onclick = () => aksi('xls'); $('#bwa').onclick = () => aksi('wa');
+
+function rentang() {
+  const v = $('#lp').value, h = new Date(), t = iso(h);
+  if (v === 'hari') return [t, t, 'Hari ini, ' + h.toLocaleDateString('id-ID', { dateStyle: 'long' })];
+  if (v === '7') { const a = iso(new Date(Date.now() - 6 * 864e5)); return [a, t, fmt(a) + ' - ' + fmt(t)]; }
+  if (v === 'bulan') return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), t, h.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })];
+  const a = $('#ld1').value || t, b = $('#ld2').value || t; return [a, b, fmt(a) + ' - ' + fmt(b)];
+}
+
+async function dataLaporan() {
+  const [dari, sampai, label] = rentang(), jenis = $('#lj').value, st = jenis === 'stok';
+  const flt = x => tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x;
+  const per = (t, k) => flt(db.from(t).select(k).gte('tanggal', dari).lte('tanggal', sampai)).order('tanggal');
+  const sk = (t, k) => flt(db.from(t).select(k)).order('nama');
+  const g = async q => (await q).data || [];
+  const [jual, beli, bahan, produk] = await Promise.all([
+    st ? [] : g(per('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)')),
+    st ? [] : g(per('pembelian', 'tanggal,qty,total_harga,metode,bahan(nama,satuan)')),
+    st ? g(sk('bahan', 'nama,satuan,tipe,stok,harga_rata')) : [],
+    st ? g(sk('produk', 'nama,stok,hpp_rata,harga_jual')) : []
+  ]);
+  const toko = me.role === 'admin' ? $('#pilih').selectedOptions[0].textContent : me.nama_toko;
+  return { jual, beli, bahan, produk, jenis, label, toko };
+}
+
+function susun(d) {
+  const { jual, beli, bahan, produk, jenis } = d;
+  const masuk = sumA(jual, r => r.qty * r.harga_satuan), keluar = sumA(beli, r => r.total_harga), laba = sumA(jual, r => r.qty * (r.harga_satuan - r.hpp_satuan));
+  const rpk = (l, v, bad) => ({ l, v, t: 'rp', bad }), txt = (l, v) => ({ l, v, t: 'txt' });
+  const sp = { toko: d.toko, label: d.label, kartu: [], tabel: [] };
+  if (jenis === 'ringkasan') {
+    sp.judul = 'Laporan Ringkasan';
+    sp.kartu = [rpk('Pemasukan', masuk), rpk('Pengeluaran', keluar), rpk('Selisih', masuk - keluar, masuk - keluar < 0), rpk('Laba penjualan', laba, laba < 0)];
+    sp.tabel.push({ judul: 'Per metode pembayaran', head: ['Metode', 'Pemasukan', 'Pengeluaran'], tipe: ['txt', 'rp', 'rp'],
+      body: METODE.map(m => [m.toUpperCase(), sumA(jual.filter(r => r.metode === m), r => r.qty * r.harga_satuan), sumA(beli.filter(r => r.metode === m), r => r.total_harga)]) });
+    const hr = [...new Set([...jual, ...beli].map(r => r.tanggal))].sort();
+    sp.tabel.push({ judul: 'Rekap harian', head: ['Tanggal', 'Pemasukan', 'Pengeluaran', 'Selisih', 'Laba'], tipe: ['tgl', 'rp', 'rp', 'rp', 'rp'],
+      body: hr.map(t => { const js = jual.filter(r => r.tanggal === t), a = sumA(js, r => r.qty * r.harga_satuan), b = sumA(beli.filter(r => r.tanggal === t), r => r.total_harga); return [t, a, b, a - b, sumA(js, r => r.qty * (r.harga_satuan - r.hpp_satuan))]; }) });
+  } else if (jenis === 'penjualan') {
+    sp.judul = 'Laporan Penjualan';
+    sp.kartu = [rpk('Total penjualan', masuk), txt('Produk terjual', +sumA(jual, r => +r.qty).toFixed(2)), rpk('Laba penjualan', laba, laba < 0)];
+    sp.tabel.push({ judul: 'Daftar penjualan', head: ['Tanggal', 'Produk', 'Jml', 'Harga', 'Total', 'Metode', 'Laba'], tipe: ['tgl', 'txt', 'txt', 'rp', 'rp', 'txt', 'rp'],
+      body: jual.map(r => [r.tanggal, r.produk?.nama, r.qty, r.harga_satuan, r.qty * r.harga_satuan, r.metode.toUpperCase(), r.qty * (r.harga_satuan - r.hpp_satuan)]) });
+  } else if (jenis === 'pembelian') {
+    sp.judul = 'Laporan Pembelian Bahan';
+    sp.kartu = [rpk('Total pengeluaran', keluar), txt('Jumlah transaksi', beli.length)];
+    sp.tabel.push({ judul: 'Daftar pembelian', head: ['Tanggal', 'Bahan', 'Jumlah', 'Total', 'Metode'], tipe: ['tgl', 'txt', 'txt', 'rp', 'txt'],
+      body: beli.map(r => [r.tanggal, r.bahan?.nama, `${r.qty} ${r.bahan?.satuan || ''}`, r.total_harga, r.metode.toUpperCase()]) });
+  } else {
+    sp.judul = 'Laporan Stok'; sp.label = 'Per ' + fmt(iso(new Date()));
+    sp.kartu = [rpk('Nilai stok bahan', sumA(bahan, r => r.stok * r.harga_rata)), rpk('Modal tertahan di produk', sumA(produk, r => r.stok * r.hpp_rata))];
+    sp.tabel.push({ judul: 'Stok bahan', head: ['Bahan', 'Tipe', 'Stok', 'Harga rata-rata', 'Nilai'], tipe: ['txt', 'txt', 'txt', 'rp', 'rp'],
+      body: bahan.map(r => [r.nama, r.tipe, `${+r.stok.toFixed(2)} ${r.satuan}`, r.harga_rata, r.stok * r.harga_rata]) });
+    sp.tabel.push({ judul: 'Stok produk', head: ['Produk', 'Stok', 'Modal', 'Harga jual', 'Nilai modal'], tipe: ['txt', 'txt', 'rp', 'rp', 'rp'],
+      body: produk.map(r => [r.nama, +r.stok.toFixed(2), r.hpp_rata, r.harga_jual, r.stok * r.hpp_rata]) });
+  }
+  return sp;
+}
+
+async function buatPDF(sp) {
+  for (const u of LIB.pdf) await muat(u);
+  const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210;
+  doc.setFillColor(61, 92, 66); doc.rect(0, 0, W, 36, 'F');
+  doc.setTextColor(255); doc.setFont('times', 'bold'); doc.setFontSize(22); doc.text(sp.toko, 14, 16);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(210, 220, 198);
+  doc.text(sp.judul, 14, 24); doc.text(sp.label, 14, 30);
+  let y = 44;
+  sp.kartu.forEach((k, i) => {
+    const x = 14 + (i % 2) * 94; if (i && i % 2 === 0) y += 25;
+    doc.setFillColor(...(k.bad ? [251, 234, 230] : [238, 237, 233])); doc.setDrawColor(...(k.bad ? [191, 82, 64] : [210, 220, 198]));
+    doc.roundedRect(x, y, 88, 21, 3, 3, 'FD');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(93, 107, 95); doc.text(k.l, x + 4, y + 7);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...(k.bad ? [191, 82, 64] : [61, 92, 66]));
+    doc.text(k.t === 'rp' ? rp(k.v) : String(k.v), x + 4, y + 16);
+  });
+  y += 32;
+  sp.tabel.forEach(t => {
+    if (y > 265) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(61, 92, 66); doc.text(t.judul, 14, y);
+    doc.autoTable({
+      startY: y + 3, head: [t.head], theme: 'striped', margin: { left: 14, right: 14 },
+      body: t.body.map(r => r.map((v, i) => t.tipe[i] === 'rp' ? rp(v) : t.tipe[i] === 'tgl' ? fmt(v) : String(v ?? ''))),
+      styles: { fontSize: 10, cellPadding: 2.6, textColor: [31, 45, 34] }, headStyles: { fillColor: [61, 92, 66], textColor: 255 },
+      alternateRowStyles: { fillColor: [238, 237, 233] },
+      columnStyles: Object.fromEntries(t.tipe.map((x, i) => [i, { halign: x === 'rp' ? 'right' : 'left' }])),
+      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [191, 82, 64]; }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(130); doc.text(`${sp.toko}  |  halaman ${i}/${n}`, 14, 290); }
+  return doc.output('blob');
+}
+
+async function buatXLSX(sp) {
+  for (const u of LIB.xls) await muat(u);
+  const wb = XLSX.utils.book_new();
+  const ring = [[sp.toko], [sp.judul], [sp.label], [], ...sp.kartu.map(k => [k.l, k.v])];
+  const w0 = XLSX.utils.aoa_to_sheet(ring); w0['!cols'] = [{ wch: 28 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, w0, 'Ringkasan');
+  sp.tabel.forEach(t => {
+    const ws = XLSX.utils.aoa_to_sheet([t.head, ...t.body]); ws['!cols'] = t.head.map(() => ({ wch: 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, t.judul.slice(0, 30));
+  });
+  return new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+const namaFile = (sp, ext) => `Laporan-${sp.judul.replace('Laporan ', '')}-${sp.toko}-${iso(new Date())}.${ext}`.replace(/[^\w.-]+/g, '_');
+const unduh = (blob, n) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = n; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
+async function aksi(mode) {
+  toast('Menyiapkan laporan...');
+  try {
+    const sp = susun(await dataLaporan());
+    if (mode === 'xls') return unduh(await buatXLSX(sp), namaFile(sp, 'xlsx'));
+    const blob = await buatPDF(sp), n = namaFile(sp, 'pdf');
+    if (mode === 'pdf') return unduh(blob, n);
+    const file = new File([blob], n, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: sp.judul }); } catch { /* dibatalkan */ } }
+    else { unduh(blob, n); toast('Perangkat ini belum mendukung bagikan langsung. PDF diunduh, silakan kirim lewat WhatsApp.'); }
+  } catch (e) { toast('Gagal membuat laporan: ' + (e.message || 'periksa koneksi')); }
+}
+
+// ===== Splash opening =====
+setTimeout(() => { const s = $('#splash'); s.classList.add('off'); setTimeout(() => s.remove(), 600); }, 1700);
