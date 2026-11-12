@@ -381,12 +381,14 @@ async function home() {
   const q = (t, k) => { const x = db.from(t).select(k).gte('tanggal', awal); return tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x; };
   let qp = db.from('produk').select('nama,stok'); if (tokoFilter !== 'all') qp = qp.eq('toko_id', tokoFilter);
   let qm = db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', rentangDash('bulan')[0]); if (tokoFilter !== 'all') qm = qm.eq('toko_id', tokoFilter);
-  const [j, b, p, m] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode'), q('pembelian', 'tanggal,total_harga,metode'), qp, qm]);
+  const [j, b, p, m] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)'), q('pembelian', 'tanggal,total_harga,metode'), qp, qm]);
   const jual = j.data || [], beli = b.data || [], produk = p.data || [];
   const sum = (a, f) => a.reduce((s, r) => s + f(r), 0), masukR = r => r.qty * r.harga_satuan;
   const jH = jual.filter(r => r.tanggal === hari), bH = beli.filter(r => r.tanggal === hari);
   const masuk = sum(jH, masukR), keluar = sum(bH, r => r.total_harga), laba = sum(jH, r => r.qty * (r.harga_satuan - r.hpp_satuan));
   const terjual = sum(jH, r => +r.qty), sisa = sum(produk, r => +r.stok);
+  const agg = {}; jH.forEach(r => { const n = r.produk?.nama || '-'; agg[n] = agg[n] || { q: 0, t: 0 }; agg[n].q += +r.qty; agg[n].t += masukR(r); });
+  const terjualList = Object.entries(agg).sort((a, b) => b[1].q - a[1].q);
   const kartu = (c, l, v, fl) => `<div class="card ${c}"><small>${l}</small><b>${v}</b>${fl ? `<span class="flag">${fl}</span>` : ''}</div>`;
   const habis = produk.length && sisa <= 0;
   const modalList = m.data || [], budget = sum(modalList, r => +r.jumlah), pakai = sum(beli.filter(r => r.tanggal >= rentangDash('bulan')[0]), r => r.total_harga);
@@ -412,6 +414,9 @@ async function home() {
     <div class="box"><div class="hd"><h3>Metode pembayaran</h3>
       <div class="seg" id="seg">${[['hari', hari === iso(new Date()) ? 'Hari ini' : fmt(hari)], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div></div>
       <div id="gr"></div></div>
+    <div class="box"><h3>Produk terjual ${suf}</h3>
+      ${terjualList.length ? terjualList.map(([n, v]) => `<div class="row"><span>${esc(n)}<br><small>${rp(v.t)}</small></span><b>${+v.q.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan pada tanggal ini.</div>'}
+    </div>
     <div class="box"><h3>Sisa produk belum terjual</h3>
       ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>`;
@@ -592,7 +597,7 @@ async function aksi(mode) {
 }
 
 // ===== Splash opening =====
-setTimeout(() => { const s = $('#splash'); s.classList.add('off'); setTimeout(() => s.remove(), 600); }, 1700);
+setTimeout(() => { const s = $('#splash'); if (!s) return; s.classList.add('off'); setTimeout(() => s.remove(), 600); }, 1700);
 
 // ===== EDIT DATA, BATALKAN TRANSAKSI, BUDGET =====
 const ed = (t, id) => me.role === 'admin' ? '' : ` data-ed="${t}" data-id="${id}"`;
