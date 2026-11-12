@@ -9,7 +9,7 @@ const rp = n => 'Rp' + Math.round(n || 0).toLocaleString('id-ID');
 const iso = d => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD (waktu lokal)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const METODE = ['cash', 'qris', 'transfer'];
-const HIJAU = ['#00441B', '#41AB5D', '#A1D99B'];
+const HIJAU = ['#3D5C42', '#6F9276', '#D2DCC4'];
 let me = null, tokoFilter = 'all', charts = [];
 
 function show(id) { $('#login').hidden = id !== 'login'; $('#app').hidden = id !== 'app'; }
@@ -82,9 +82,9 @@ async function home() {
     <p class="tgl">${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p>
     <div class="grid">
       <div class="card in"><small>Pemasukan hari ini</small><b>${rp(masuk)}</b></div>
-      <div class="card out"><small>Pengeluaran hari ini</small><b>${rp(keluar)}</b></div>
-      <div class="card hi"><small>Selisih</small><b>${rp(masuk - keluar)}</b></div>
-      <div class="card hi"><small>Laba penjualan</small><b>${rp(laba)}</b></div>
+      <div class="card ${keluar > masuk ? 'warn' : 'out'}"><small>Pengeluaran hari ini</small><b>${rp(keluar)}</b>${keluar > masuk ? '<span class="flag">Lebih besar dari pemasukan</span>' : ''}</div>
+      <div class="card ${masuk - keluar < 0 ? 'bad' : 'hi'}"><small>Selisih</small><b>${rp(masuk - keluar)}</b>${masuk - keluar < 0 ? '<span class="flag">Defisit hari ini</span>' : ''}</div>
+      <div class="card ${laba < 0 ? 'bad' : 'hi'}"><small>Laba penjualan</small><b>${rp(laba)}</b>${laba < 0 ? '<span class="flag">Penjualan di bawah modal</span>' : ''}</div>
     </div>
     <div class="box"><h3>Per metode pembayaran (hari ini)</h3>
       <canvas id="c1" height="170"></canvas>
@@ -92,7 +92,7 @@ async function home() {
     </div>
     <div class="box"><h3>7 hari terakhir</h3><canvas id="c2" height="200"></canvas></div>
     <div class="box"><h3>Sisa produk belum terjual</h3>
-      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
+      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>`;
 
   charts.forEach(c => c.destroy());
@@ -107,8 +107,8 @@ async function home() {
       data: {
         labels: hari7.map(d => d.slice(8) + '/' + d.slice(5, 7)),
         datasets: [
-          { label: 'Pemasukan', backgroundColor: '#238845', borderRadius: 6, data: hari7.map(d => sum(jual.filter(r => r.tanggal === d), r => r.qty * r.harga_satuan)) },
-          { label: 'Pengeluaran', backgroundColor: '#A1D99B', borderRadius: 6, data: hari7.map(d => sum(beli.filter(r => r.tanggal === d), r => r.total_harga)) }
+          { label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 6, data: hari7.map(d => sum(jual.filter(r => r.tanggal === d), r => r.qty * r.harga_satuan)) },
+          { label: 'Pengeluaran', backgroundColor: '#6F9276', borderRadius: 6, data: hari7.map(d => sum(beli.filter(r => r.tanggal === d), r => r.total_harga)) }
         ]
       },
       options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } }
@@ -156,7 +156,7 @@ async function beli() {
 
   $('#view').innerHTML = form + `
     <div class="box"><h3>Stok bahan</h3>
-      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b>${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
+      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
     </div>
     <div class="box"><h3>Pembelian terakhir</h3>
       ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
@@ -221,7 +221,7 @@ async function produksi() {
     <div class="box"><h3>Produk dan resep</h3>
       ${produk.length ? produk.map(x => {
         const r = resep.filter(y => y.produk_id === x.id).map(y => `${y.takaran} ${esc(y.bahan?.satuan)} ${esc(y.bahan?.nama)}`).join(', ');
-        return `<div class="row"><span>${esc(x.nama)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
+        return `<div class="row"><span>${esc(x.nama)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
       }).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>
     <div class="box"><h3>Produksi terakhir</h3>
@@ -301,7 +301,7 @@ async function jual() {
 
   $('#view').innerHTML = form + `
     <div class="box"><h3>Penjualan terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} × ${rp(x.harga_satuan)}<br>Laba ${rp(x.qty * (x.harga_satuan - x.hpp_satuan))}</small></span><b>${rp(x.qty * x.harga_satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan.</div>'}
+      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} × ${rp(x.harga_satuan)}<br><span class="${x.harga_satuan < x.hpp_satuan ? 'neg' : ''}">Laba ${rp(x.qty * (x.harga_satuan - x.hpp_satuan))}</span></small></span><b>${rp(x.qty * x.harga_satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan.</div>'}
     </div>`;
   if (admin) return;
 
@@ -317,3 +317,8 @@ async function jual() {
     toast('Penjualan tersimpan'); jual();
   };
 }
+
+// Peringatan modal: rugi jika modal >= harga jual, margin tipis jika modal > 70% harga jual
+const tagMargin = x => (x.hpp_rata <= 0 || x.harga_jual <= 0) ? ''
+  : x.hpp_rata >= x.harga_jual ? '<span class="tag bad">Rugi</span>'
+  : x.hpp_rata > x.harga_jual * 0.7 ? '<span class="tag warn">Margin tipis</span>' : '';
