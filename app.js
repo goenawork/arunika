@@ -34,14 +34,17 @@ async function enter() {
     const { data: t } = await db.from('profiles').select('id,nama_toko').eq('role', 'toko').order('nama_toko');
     $('#pilih').innerHTML = '<option value="all">Semua Toko</option>' + (t || []).map(x => `<option value="${x.id}">${esc(x.nama_toko)}</option>`).join('');
     $('#pilih').hidden = false;
-    $('#pilih').onchange = e => { tokoFilter = e.target.value; home(); };
+    $('#pilih').onchange = e => { tokoFilter = e.target.value; buka(cur); };
   }
   home();
 }
 
+let cur = 'home';
+const HALAMAN = { home, beli };
+const buka = (p, label) => { cur = p; (HALAMAN[p] || (() => soon(label)))(); };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
-  b.dataset.p === 'home' ? home() : soon(b.textContent);
+  buka(b.dataset.p, b.textContent);
 });
 
 function soon(nama) {
@@ -117,3 +120,61 @@ async function home() {
   const { data: { session } } = await db.auth.getSession();
   session ? enter() : show('login');
 })();
+
+// ===== Notifikasi singkat =====
+function toast(t) {
+  const d = document.createElement('div');
+  d.className = 'toast'; d.textContent = t;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 2800);
+}
+
+// ===== Halaman BELI (pembelian bahan baku + master bahan) =====
+async function beli() {
+  charts.forEach(c => c.destroy()); charts = [];
+  const admin = me.role === 'admin';
+  let qb = db.from('bahan').select('id,nama,satuan,tipe,stok,harga_rata').order('nama');
+  let qp = db.from('pembelian').select('tanggal,qty,total_harga,metode,bahan(nama,satuan)').order('created_at', { ascending: false }).limit(15);
+  if (tokoFilter !== 'all') { qb = qb.eq('toko_id', tokoFilter); qp = qp.eq('toko_id', tokoFilter); }
+  const [b, p] = await Promise.all([qb, qp]);
+  const bahan = b.data || [], riwayat = p.data || [];
+
+  const form = admin
+    ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
+    : `<div class="box"><h3>Beli bahan</h3>
+        <select id="bb">${bahan.length ? bahan.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.satuan)})</option>`).join('') : '<option value="">Tambah bahan dulu di bawah</option>'}</select>
+        <input id="bq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah">
+        <input id="bt" type="number" inputmode="numeric" min="0" placeholder="Total harga (Rp)">
+        <select id="bm"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="transfer">Transfer</option></select>
+        <input id="bd" type="date" value="${iso(new Date())}">
+        <button class="btn" id="sB">Simpan pembelian</button></div>
+      <div class="box"><h3>Tambah bahan baru</h3>
+        <input id="nn" placeholder="Nama bahan">
+        <input id="ns" placeholder="Satuan (kg, liter, pcs)">
+        <select id="nt"><option value="otomatis">Otomatis (berkurang saat produksi)</option><option value="manual">Manual (dikurangi lewat penyesuaian)</option></select>
+        <button class="btn" id="sN">Tambah bahan</button></div>`;
+
+  $('#view').innerHTML = form + `
+    <div class="box"><h3>Stok bahan</h3>
+      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b>${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
+    </div>
+    <div class="box"><h3>Pembelian terakhir</h3>
+      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
+    </div>`;
+  if (admin) return;
+
+  $('#sB').onclick = async () => {
+    const qty = +$('#bq').value, total = +$('#bt').value;
+    if (!$('#bb').value || qty <= 0 || total < 0 || !$('#bt').value) return toast('Lengkapi bahan, jumlah, dan total harga');
+    const { error } = await db.rpc('catat_pembelian', { p_bahan: $('#bb').value, p_qty: qty, p_total: total, p_metode: $('#bm').value, p_tanggal: $('#bd').value });
+    if (error) return toast(error.message);
+    toast('Pembelian tersimpan'); beli();
+  };
+  $('#sN').onclick = async () => {
+    const nama = $('#nn').value.trim(), satuan = $('#ns').value.trim();
+    if (!nama || !satuan) return toast('Isi nama dan satuan bahan');
+    const { error } = await db.from('bahan').insert({ nama, satuan, tipe: $('#nt').value });
+    if (error) return toast(error.message);
+    toast('Bahan ditambahkan'); beli();
+  };
+}
