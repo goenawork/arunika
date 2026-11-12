@@ -1,7 +1,4 @@
-// ===== ISI DUA BARIS INI (Supabase > Project Settings > API) =====
-const SUPABASE_URL = 'https://rmzpsfpsgdobnfazzqun.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_w8xCMLvk85S1pBZ_qmXU_g_jzSNrJZU'; // kunci anon/publik, BUKAN service_role
-// ==================================================================
+// Konfigurasi Supabase ada di config.js
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
