@@ -108,7 +108,7 @@ nav button.on svg{stroke-width:1.8}
 #login .btn{background:#EEEDE9;color:#2b3a2e}
 .hl{display:flex;align-items:center;gap:10px;min-width:0}
 .hlogo{height:34px;width:auto;flex:none}
-#toko{font-family:"Fraunces",Georgia,serif;font-size:21px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toko{font-weight:800;font-size:20px;letter-spacing:.2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav button svg{stroke-width:1.8}
 
 /* ===== Dashboard ===== */
@@ -131,7 +131,7 @@ h4{margin:18px 0 8px;font-size:13px;color:#5d6b5f}
 .lapbtn{background:#3D5C42;color:#fff;border:0;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600}
 
 /* ===== Panel laporan & kata sandi ===== */
-#lap{position:fixed;inset:0;background:rgba(31,45,34,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+#lap,#ed{position:fixed;inset:0;background:rgba(31,45,34,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .sh{max-height:92vh;overflow-y:auto}
 .x{position:absolute;right:12px;top:6px;border:0;background:none;font-size:30px;color:var(--mu)}
 .sh h3{margin:0 0 6px;color:#3D5C42}
@@ -141,3 +141,21 @@ h4{margin:18px 0 8px;font-size:13px;color:#5d6b5f}
 .btn.wa{margin-top:10px}
 details.pw{margin:6px 0 10px}
 details.pw summary{cursor:pointer;color:#3D5C42;font-weight:600;font-size:14px;padding:8px 0}
+
+/* ===== Tanggal, budget, edit ===== */
+.tgw{position:relative}
+.tgb{background:#EEEDE9;border:0;border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;color:#3D5C42}
+.tgw input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;padding:0;cursor:pointer}
+.prog{height:12px;background:#EEEDE9;border-radius:99px;overflow:hidden;margin-bottom:10px}
+.prog i{display:block;height:100%;background:#3D5C42;border-radius:99px}
+.prog i.warn{background:#FF8845}.prog i.bad{background:#BF5240}
+.flag.bad{color:#BF5240}
+.row b{margin-left:auto}
+.row[data-ed],.row[data-bt]{cursor:pointer}
+.row[data-ed]::after,.row[data-bt]::after{content:'\203A';color:#6F9276;font-size:22px;margin-left:10px;line-height:1}
+.rl{display:flex;align-items:center;gap:8px;padding:6px 0}
+.rl span{flex:1;font-size:14px}
+.rl input{width:92px;margin:0;padding:8px}
+.rl b{font-size:13px}
+.rl button{border:0;background:none;font-size:26px;color:#BF5240;line-height:1}
+#eds{margin-top:6px}
