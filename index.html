@@ -10,10 +10,11 @@
 </head>
 <body>
 <div id="splash"></div>
+<script>try{if(sessionStorage.getItem('sp')){document.getElementById('splash').remove()}else{sessionStorage.setItem('sp','1')}}catch(e){}</script>
 
 <section id="login" hidden>
   <div class="lw">
-    <img src="logo.png" class="biglogo" alt="Logo">
+    <div class="brand"><img src="logo.png" class="biglogo" alt="Logo"><h1>ARUNIKA</h1><p>Manage Better. Grow Further.</p><span class="gw">Goena<i>work</i></span></div>
     <form id="f">
       <input id="em" type="email" placeholder="Email" required autocomplete="username">
       <input id="pw" type="password" placeholder="Kata sandi" required autocomplete="current-password">
