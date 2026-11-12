@@ -69,7 +69,7 @@ async function beli() {
   charts.forEach(c => c.destroy()); charts = [];
   const admin = me.role === 'admin';
   let qb = db.from('bahan').select('id,nama,satuan,tipe,stok,harga_rata').order('nama');
-  let qp = db.from('pembelian').select('tanggal,qty,total_harga,metode,bahan(nama,satuan)').order('created_at', { ascending: false }).limit(15);
+  let qp = db.from('pembelian').select('id,tanggal,qty,total_harga,metode,bahan(nama,satuan)').order('created_at', { ascending: false }).limit(15);
   if (tokoFilter !== 'all') { qb = qb.eq('toko_id', tokoFilter); qp = qp.eq('toko_id', tokoFilter); }
   const [b, p] = await Promise.all([qb, qp]);
   const bahan = b.data || [], riwayat = p.data || [];
@@ -91,10 +91,10 @@ async function beli() {
 
   $('#view').innerHTML = form + `
     <div class="box"><h3>Stok bahan</h3>
-      ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
+      ${bahan.length ? bahan.map(x => `<div class="row"${ed('bahan', x.id)}><span>${esc(x.nama)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
     </div>
     <div class="box"><h3>Pembelian terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
+      ${riwayat.length ? riwayat.map(x => `<div class="row"${bt('pembelian', x.id)}><span>${esc(x.bahan?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
     </div>`;
   initTabs('beli');
   if (admin) return;
@@ -129,7 +129,7 @@ async function produksi() {
     f('produk', 'id,nama,harga_jual,stok,hpp_rata', { c: 'nama' }),
     f('bahan', 'id,nama,satuan', { c: 'nama' }, ['tipe', 'otomatis']),
     f('resep', 'produk_id,takaran,bahan(nama,satuan)', { c: 'produk_id' }),
-    f('produksi', 'tanggal,qty,hpp_satuan,produk(nama)', { c: 'created_at', opt: { ascending: false } }).limit(10)
+    f('produksi', 'id,tanggal,qty,hpp_satuan,produk(nama)', { c: 'created_at', opt: { ascending: false } }).limit(10)
   ]);
   const produk = pr.data || [], bahan = bh.data || [], resep = rs.data || [], riwayat = hs.data || [];
   const optP = produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join('') : '<option value="">Tambah produk dulu</option>';
@@ -156,11 +156,11 @@ async function produksi() {
     <div class="box"><h3>Produk dan resep</h3>
       ${produk.length ? produk.map(x => {
         const r = resep.filter(y => y.produk_id === x.id).map(y => `${y.takaran} ${esc(y.bahan?.satuan)} ${esc(y.bahan?.nama)}`).join(', ');
-        return `<div class="row"><span>${esc(x.nama)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
+        return `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
       }).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>
     <div class="box"><h3>Produksi terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · modal ${rp(x.hpp_satuan)}/pcs</small></span><b>${x.qty}</b></div>`).join('') : '<div class="kosong">Belum ada produksi.</div>'}
+      ${riwayat.length ? riwayat.map(x => `<div class="row"${bt('produksi', x.id)}><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · modal ${rp(x.hpp_satuan)}/pcs</small></span><b>${x.qty}</b></div>`).join('') : '<div class="kosong">Belum ada produksi.</div>'}
     </div>`;
   initTabs('produksi');
   if (admin) return;
@@ -214,7 +214,7 @@ async function jual() {
   };
   const [pr, hs] = await Promise.all([
     f('produk', 'id,nama,harga_jual,stok', 'nama'),
-    f('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)', 'created_at', { ascending: false }).limit(15)
+    f('penjualan', 'id,tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)', 'created_at', { ascending: false }).limit(15)
   ]);
   const produk = pr.data || [], riwayat = hs.data || [];
 
@@ -236,7 +236,7 @@ async function jual() {
 
   $('#view').innerHTML = form + `
     <div class="box"><h3>Penjualan terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} × ${rp(x.harga_satuan)}<br><span class="${x.harga_satuan < x.hpp_satuan ? 'neg' : ''}">Laba ${rp(x.qty * (x.harga_satuan - x.hpp_satuan))}</span></small></span><b>${rp(x.qty * x.harga_satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan.</div>'}
+      ${riwayat.length ? riwayat.map(x => `<div class="row"${bt('penjualan', x.id)}><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} × ${rp(x.harga_satuan)}<br><span class="${x.harga_satuan < x.hpp_satuan ? 'neg' : ''}">Laba ${rp(x.qty * (x.harga_satuan - x.hpp_satuan))}</span></small></span><b>${rp(x.qty * x.harga_satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan.</div>'}
     </div>`;
   if (admin) return;
 
@@ -270,7 +270,7 @@ async function stok() {
   const [b, p, h] = await Promise.all([
     f('bahan', 'id,nama,satuan,tipe,stok,harga_rata', 'nama'),
     f('produk', 'id,nama,harga_jual,stok,hpp_rata', 'nama'),
-    f('penyesuaian', 'tanggal,qty,nilai,alasan,bahan(nama,satuan),produk(nama)', 'created_at', { ascending: false }).limit(10)
+    f('penyesuaian', 'id,tanggal,qty,nilai,alasan,bahan(nama,satuan),produk(nama)', 'created_at', { ascending: false }).limit(10)
   ]);
   const bahan = b.data || [], produk = p.data || [], riwayat = h.data || [];
   const sum = (a, fn) => a.reduce((s, r) => s + fn(r), 0);
@@ -278,10 +278,10 @@ async function stok() {
 
   const paneBahan = `<div class="box pane c1" data-t="0"><h3>Stok bahan</h3>
     <div class="total">Nilai persediaan: ${rp(sum(bahan, x => x.stok * x.harga_rata))}</div>
-    ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}${habis(x)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}</div>`;
+    ${bahan.length ? bahan.map(x => `<div class="row"${ed('bahan', x.id)}><span>${esc(x.nama)}${habis(x)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}</div>`;
   const paneProduk = `<div class="box pane c2" data-t="1"><h3>Stok produk (belum terjual)</h3>
     <div class="total">Modal tertahan: ${rp(sum(produk, x => x.stok * x.hpp_rata))}</div>
-    ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}</div>`;
+    ${produk.length ? produk.map(x => `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}</div>`;
   const paneAdj = admin ? '' : `
     <div class="box pane c3" data-t="2"><h3>Catat penyesuaian</h3>
       <div class="note">Untuk bahan manual yang terpakai, atau bahan/produk yang rusak, basi, dan dibuang. Stok berkurang dan nilai modalnya tercatat sebagai kerugian.</div>
@@ -296,7 +296,7 @@ async function stok() {
       <input id="sd" type="date" value="${iso(new Date())}">
       <button class="btn" id="sS">Simpan penyesuaian</button></div>
     <div class="box pane c3" data-t="2"><h3>Penyesuaian terakhir</h3>
-      ${riwayat.length ? riwayat.map(x => { const n = x.bahan || x.produk; return `<div class="row"><span>${esc(n?.nama)}<br><small>${x.tanggal} · -${x.qty}${x.bahan ? ' ' + esc(x.bahan.satuan) : ''} · ${esc(x.alasan)}</small></span><b class="neg">${rp(x.nilai)}</b></div>`; }).join('') : '<div class="kosong">Belum ada penyesuaian.</div>'}</div>`;
+      ${riwayat.length ? riwayat.map(x => { const n = x.bahan || x.produk; return `<div class="row"${bt('penyesuaian', x.id)}><span>${esc(n?.nama)}<br><small>${x.tanggal} · -${x.qty}${x.bahan ? ' ' + esc(x.bahan.satuan) : ''} · ${esc(x.alasan)}</small></span><b class="neg">${rp(x.nilai)}</b></div>`; }).join('') : '<div class="kosong">Belum ada penyesuaian.</div>'}</div>`;
 
   $('#view').innerHTML = tabBar(admin ? ['Stok bahan', 'Stok produk'] : ['Stok bahan', 'Stok produk', 'Penyesuaian']) + paneBahan + paneProduk + paneAdj;
   initTabs('stok');
@@ -368,19 +368,20 @@ $('#fto').onchange = async e => {
 
 // ===== BERANDA (dashboard) =====
 const WARNA_M = ['#3D5C42', '#8DBF9A', '#E8B64A'], NAMA_M = ['Cash', 'QRIS', 'Transfer'];
-let periodeGrafik = 'hari';
+let periodeGrafik = 'hari', tglDash = iso(new Date());
 function rentangDash(p) {
   const t = new Date(), e = iso(t);
-  if (p === 'hari') return [e, e];
+  if (p === 'hari') return [tglDash, tglDash];
   if (p === 'minggu') return [iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (t.getDay() + 6) % 7)), e];
   return [iso(new Date(t.getFullYear(), t.getMonth(), 1)), e];
 }
 async function home() {
-  const hari = iso(new Date());
-  const awal = [rentangDash('bulan')[0], rentangDash('minggu')[0]].sort()[0];
+  const hari = tglDash, suf = hari === iso(new Date()) ? 'hari ini' : fmt(hari);
+  const awal = [rentangDash('bulan')[0], rentangDash('minggu')[0], hari].sort()[0];
   const q = (t, k) => { const x = db.from(t).select(k).gte('tanggal', awal); return tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x; };
   let qp = db.from('produk').select('nama,stok'); if (tokoFilter !== 'all') qp = qp.eq('toko_id', tokoFilter);
-  const [j, b, p] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode'), q('pembelian', 'tanggal,total_harga,metode'), qp]);
+  let qm = db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', rentangDash('bulan')[0]); if (tokoFilter !== 'all') qm = qm.eq('toko_id', tokoFilter);
+  const [j, b, p, m] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode'), q('pembelian', 'tanggal,total_harga,metode'), qp, qm]);
   const jual = j.data || [], beli = b.data || [], produk = p.data || [];
   const sum = (a, f) => a.reduce((s, r) => s + f(r), 0), masukR = r => r.qty * r.harga_satuan;
   const jH = jual.filter(r => r.tanggal === hari), bH = beli.filter(r => r.tanggal === hari);
@@ -388,19 +389,28 @@ async function home() {
   const terjual = sum(jH, r => +r.qty), sisa = sum(produk, r => +r.stok);
   const kartu = (c, l, v, fl) => `<div class="card ${c}"><small>${l}</small><b>${v}</b>${fl ? `<span class="flag">${fl}</span>` : ''}</div>`;
   const habis = produk.length && sisa <= 0;
+  const modalList = m.data || [], budget = sum(modalList, r => +r.jumlah), pakai = sum(beli.filter(r => r.tanggal >= rentangDash('bulan')[0]), r => r.total_harga);
+  const pct = budget > 0 ? pakai / budget * 100 : 0, sisaB = budget - pakai, wb = pct > 100 ? 'bad' : pct >= 80 ? 'warn' : '';
+  const ket0 = !budget ? 'Belum ada budget bulan ini' : pct > 100 ? 'Budget terlampaui' : pct >= 80 ? 'Mendekati batas budget' : '';
 
   $('#view').innerHTML = `
-    <div class="bar"><p class="tgl">${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p><button class="lapbtn" id="bl">Laporan</button></div>
+    <div class="bar"><div class="tgw"><button class="tgb" type="button">${new Date(hari + 'T00:00').toLocaleDateString('id-ID', { dateStyle: 'full' })} &#9662;</button><input type="date" id="tgl" value="${hari}" max="${iso(new Date())}"></div><button class="lapbtn" id="bl">Laporan</button></div>
     <div class="grid">
-      ${kartu('in', 'Pemasukan hari ini', rp(masuk))}
-      ${kartu(keluar > masuk ? 'warn' : 'out', 'Pengeluaran hari ini', rp(keluar), keluar > masuk ? 'Lebih besar dari pemasukan' : '')}
-      ${kartu(masuk - keluar < 0 ? 'bad' : 'hi', 'Selisih', rp(masuk - keluar), masuk - keluar < 0 ? 'Defisit hari ini' : '')}
+      ${kartu('in', `Pemasukan ${suf}`, rp(masuk))}
+      ${kartu(keluar > masuk ? 'warn' : 'out', `Pengeluaran ${suf}`, rp(keluar), keluar > masuk ? 'Lebih besar dari pemasukan' : '')}
+      ${kartu(masuk - keluar < 0 ? 'bad' : 'hi', 'Selisih', rp(masuk - keluar), masuk - keluar < 0 ? 'Defisit' : '')}
       ${kartu(laba < 0 ? 'bad' : 'hi', 'Laba penjualan', rp(laba), laba < 0 ? 'Penjualan di bawah modal' : '')}
-      ${kartu('', 'Produk terjual hari ini', +terjual.toFixed(2))}
+      ${kartu('', `Produk terjual ${suf}`, +terjual.toFixed(2))}
       ${kartu(habis ? 'warn' : '', 'Produk tersisa', +sisa.toFixed(2), habis ? 'Stok produk habis' : '')}
     </div>
+    <div class="box"><div class="hd"><h3>Budget bahan baku bulan ini</h3>${me.role === 'admin' ? '' : '<button class="lapbtn" id="bb">+ Tambah</button>'}</div>
+      <div class="prog"><i class="${wb}" style="width:${Math.min(100, pct)}%"></i></div>
+      <div class="row"><span>Terpakai</span><b>${rp(pakai)}</b></div>
+      <div class="row"><span>Budget</span><b>${rp(budget)}</b></div>
+      <div class="row"><span>Sisa budget</span><b class="${sisaB < 0 ? 'neg' : ''}">${rp(sisaB)}</b></div>
+      ${ket0 ? `<span class="flag ${wb}">${ket0}</span>` : ''}</div>
     <div class="box"><div class="hd"><h3>Metode pembayaran</h3>
-      <div class="seg" id="seg">${[['hari', 'Hari ini'], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div></div>
+      <div class="seg" id="seg">${[['hari', hari === iso(new Date()) ? 'Hari ini' : fmt(hari)], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div></div>
       <div id="gr"></div></div>
     <div class="box"><h3>Sisa produk belum terjual</h3>
       ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
@@ -429,6 +439,8 @@ async function home() {
     ];
   };
   gambar();
+  $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
+  if ($('#bb')) $('#bb').onclick = () => modalSheet(modalList);
 }
 
 // ===== KATA SANDI =====
@@ -451,7 +463,7 @@ const muat = src => new Promise((ok, no) => { if (document.querySelector(`script
 const fmt = d => new Date(d + 'T00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 const sumA = (a, f) => a.reduce((s, r) => s + f(r), 0);
 
-$('#view').addEventListener('click', e => { if (e.target.closest('#bl')) $('#lap').hidden = false; });
+$('#view').addEventListener('click', e => { if (e.target.closest('#bl')) { $('#lp').options[0].textContent = tglDash === iso(new Date()) ? 'Hari ini' : fmt(tglDash); $('#lap').hidden = false; } });
 $('#lap .x').onclick = () => { $('#lap').hidden = true; };
 $('#lap').onclick = e => { if (e.target.id === 'lap') e.target.hidden = true; };
 $('#lp').onchange = () => { $('#lrg').hidden = $('#lp').value !== 'kustom'; };
@@ -460,7 +472,7 @@ $('#bpdf').onclick = () => aksi('pdf'); $('#bxls').onclick = () => aksi('xls'); 
 
 function rentang() {
   const v = $('#lp').value, h = new Date(), t = iso(h);
-  if (v === 'hari') return [t, t, 'Hari ini, ' + h.toLocaleDateString('id-ID', { dateStyle: 'long' })];
+  if (v === 'hari') { const a = tglDash; return [a, a, (a === t ? 'Hari ini, ' : '') + new Date(a + 'T00:00').toLocaleDateString('id-ID', { dateStyle: 'long' })]; }
   if (v === '7') { const a = iso(new Date(Date.now() - 6 * 864e5)); return [a, t, fmt(a) + ' - ' + fmt(t)]; }
   if (v === 'bulan') return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), t, h.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })];
   const a = $('#ld1').value || t, b = $('#ld2').value || t; return [a, b, fmt(a) + ' - ' + fmt(b)];
@@ -473,8 +485,8 @@ async function dataLaporan() {
   const sk = (t, k) => flt(db.from(t).select(k)).order('nama');
   const g = async q => (await q).data || [];
   const [jual, beli, bahan, produk] = await Promise.all([
-    st ? [] : g(per('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)')),
-    st ? [] : g(per('pembelian', 'tanggal,qty,total_harga,metode,bahan(nama,satuan)')),
+    st ? [] : g(per('penjualan', 'id,tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)')),
+    st ? [] : g(per('pembelian', 'id,tanggal,qty,total_harga,metode,bahan(nama,satuan)')),
     st ? g(sk('bahan', 'nama,satuan,tipe,stok,harga_rata')) : [],
     st ? g(sk('produk', 'nama,stok,hpp_rata,harga_jual')) : []
   ]);
@@ -520,7 +532,7 @@ async function buatPDF(sp) {
   for (const u of LIB.pdf) await muat(u);
   const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210;
   doc.setFillColor(61, 92, 66); doc.rect(0, 0, W, 36, 'F');
-  doc.setTextColor(255); doc.setFont('times', 'bold'); doc.setFontSize(22); doc.text(sp.toko, 14, 16);
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.text(sp.toko, 14, 16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(210, 220, 198);
   doc.text(sp.judul, 14, 24); doc.text(sp.label, 14, 30);
   let y = 44;
@@ -581,3 +593,71 @@ async function aksi(mode) {
 
 // ===== Splash opening =====
 setTimeout(() => { const s = $('#splash'); s.classList.add('off'); setTimeout(() => s.remove(), 600); }, 1700);
+
+// ===== EDIT DATA, BATALKAN TRANSAKSI, BUDGET =====
+const ed = (t, id) => me.role === 'admin' ? '' : ` data-ed="${t}" data-id="${id}"`;
+const bt = (t, id) => me.role === 'admin' ? '' : ` data-bt="${t}" data-id="${id}"`;
+const ket = e => e.code === '23503' ? 'Tidak bisa dihapus karena sudah dipakai transaksi atau resep. Cukup ubah namanya bila perlu.' : e.message;
+
+function bukaEdit(o) {
+  $('#edj').textContent = o.judul; $('#edf').innerHTML = o.html; $('#ed').hidden = false;
+  $('#eds').hidden = !o.simpan; $('#edh').hidden = !o.hapus; $('#edh').textContent = o.lbl || 'Hapus';
+  const selesai = async (fn, pesan) => { const err = await fn(); if (err) return toast(err); $('#ed').hidden = true; toast(pesan); buka(cur, ''); };
+  $('#eds').onclick = () => selesai(o.simpan, o.ok || 'Tersimpan');
+  $('#edh').onclick = () => { if (confirm('Yakin?')) selesai(o.hapus, o.okH || 'Data dihapus'); };
+}
+$('#ed .x').onclick = () => { $('#ed').hidden = true; buka(cur, ''); };
+$('#ed').onclick = e => { if (e.target.id === 'ed') { e.target.hidden = true; buka(cur, ''); } };
+$('#edf').addEventListener('click', async e => {
+  const b = e.target.closest('[data-mdel],[data-rdel]'); if (!b || !confirm('Hapus baris ini?')) return;
+  const [tb, id] = b.dataset.mdel ? ['modal', b.dataset.mdel] : ['resep', b.dataset.rdel];
+  const { error } = await db.from(tb).delete().eq('id', id);
+  if (error) return toast(ket(error));
+  b.closest('.rl').remove(); toast('Terhapus');
+});
+$('#view').addEventListener('click', e => {
+  const r = e.target.closest('[data-ed],[data-bt]'); if (!r || me.role === 'admin') return;
+  r.dataset.ed ? editData(r.dataset.ed, r.dataset.id) : batalTrx(r.dataset.bt, r.dataset.id, r.innerText.replace(/\n+/g, ' | '));
+});
+
+async function editData(tipe, id) {
+  if (tipe === 'bahan') {
+    const { data: x } = await db.from('bahan').select('nama,satuan,tipe').eq('id', id).single();
+    return bukaEdit({
+      judul: 'Ubah bahan', ok: 'Bahan diperbarui', lbl: 'Hapus bahan',
+      html: `<label>Nama bahan</label><input id="e1" value="${esc(x.nama)}"><label>Satuan</label><input id="e2" value="${esc(x.satuan)}"><label>Tipe bahan</label><select id="e3"><option value="otomatis"${x.tipe === 'otomatis' ? ' selected' : ''}>Otomatis (berkurang saat produksi)</option><option value="manual"${x.tipe === 'manual' ? ' selected' : ''}>Manual (dikurangi lewat penyesuaian)</option></select>`,
+      simpan: async () => { const n = $('#e1').value.trim(), s = $('#e2').value.trim(); if (!n || !s) return 'Isi nama dan satuan'; const { error } = await db.from('bahan').update({ nama: n, satuan: s, tipe: $('#e3').value }).eq('id', id); return error && ket(error); },
+      hapus: async () => { const { error } = await db.from('bahan').delete().eq('id', id); return error && ket(error); }
+    });
+  }
+  const [{ data: x }, { data: rs }] = await Promise.all([db.from('produk').select('nama,harga_jual').eq('id', id).single(), db.from('resep').select('id,takaran,bahan(nama,satuan)').eq('produk_id', id)]);
+  bukaEdit({
+    judul: 'Ubah produk', ok: 'Produk diperbarui', lbl: 'Hapus produk',
+    html: `<label>Nama produk</label><input id="e1" value="${esc(x.nama)}"><label>Harga jual (Rp)</label><input id="e2" type="number" inputmode="numeric" min="0" value="${x.harga_jual}">` +
+      ((rs || []).length ? '<h4>Resep (takaran per 1 produk)</h4>' + rs.map(r => `<div class="rl"><span>${esc(r.bahan?.nama)} (${esc(r.bahan?.satuan)})</span><input type="number" step="any" min="0" value="${r.takaran}" data-rid="${r.id}"><button data-rdel="${r.id}" aria-label="Hapus">&times;</button></div>`).join('') : ''),
+    simpan: async () => {
+      const n = $('#e1').value.trim(); if (!n || $('#e2').value === '') return 'Isi nama dan harga jual';
+      let { error } = await db.from('produk').update({ nama: n, harga_jual: +$('#e2').value }).eq('id', id); if (error) return ket(error);
+      for (const i of document.querySelectorAll('[data-rid]')) { const t = +i.value; if (t > 0) { ({ error } = await db.from('resep').update({ takaran: t }).eq('id', i.dataset.rid)); if (error) return ket(error); } }
+      return null;
+    },
+    hapus: async () => { const { error } = await db.from('produk').delete().eq('id', id); return error && ket(error); }
+  });
+}
+
+function batalTrx(t, id, ring) {
+  bukaEdit({
+    judul: 'Batalkan transaksi?', lbl: 'Batalkan transaksi', okH: 'Transaksi dibatalkan',
+    html: `<p class="info">${esc(ring)}</p><p class="info">Stok dan uangnya dikembalikan otomatis. Setelah itu kamu bisa mencatat ulang dengan nilai yang benar.</p>`,
+    hapus: async () => { const { error } = await db.rpc('batal_' + t, { p_id: id }); return error && error.message; }
+  });
+}
+
+function modalSheet(list) {
+  const baris = list.map(r => `<div class="rl"><span>${fmt(r.tanggal)}${r.catatan ? ' | ' + esc(r.catatan) : ''}</span><b>${rp(r.jumlah)}</b><button data-mdel="${r.id}" aria-label="Hapus">&times;</button></div>`).join('');
+  bukaEdit({
+    judul: 'Tambah budget atau modal', ok: 'Budget ditambahkan',
+    html: `<p class="info">Setiap tambahan akan menambah budget bahan baku bulan ini.</p><label>Jumlah (Rp)</label><input id="e1" type="number" inputmode="numeric" min="0"><label>Catatan (opsional)</label><input id="e2" placeholder="Contoh: modal tambahan"><label>Tanggal</label><input id="e3" type="date" value="${iso(new Date())}">` + (baris ? '<h4>Tambahan bulan ini</h4>' + baris : ''),
+    simpan: async () => { const j = +$('#e1').value; if (!(j > 0)) return 'Isi jumlah budget'; const { error } = await db.from('modal').insert({ jumlah: j, catatan: $('#e2').value.trim() || null, tanggal: $('#e3').value }); return error && error.message; }
+  });
+}
