@@ -63,3 +63,5 @@ input:focus,select:focus{outline:2px solid #41AB5D;border-color:#41AB5D}
 .box h3{color:#00441B}
 .row{border-color:#E5F5E0}
 .row b{color:#006D2C}
+
+.total{background:#E5F5E0;color:#00441B;font-weight:700;padding:12px;border-radius:12px;text-align:center;margin-top:6px}
