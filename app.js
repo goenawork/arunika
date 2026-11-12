@@ -9,7 +9,7 @@ const rp = n => 'Rp' + Math.round(n || 0).toLocaleString('id-ID');
 const iso = d => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD (waktu lokal)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const METODE = ['cash', 'qris', 'transfer'];
-const HIJAU = ['#0b6b3a', '#22a55a', '#3ecf8e'];
+const HIJAU = ['#00441B', '#41AB5D', '#A1D99B'];
 let me = null, tokoFilter = 'all', charts = [];
 
 function show(id) { $('#login').hidden = id !== 'login'; $('#app').hidden = id !== 'app'; }
@@ -81,8 +81,8 @@ async function home() {
   $('#view').innerHTML = `
     <p class="tgl">${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p>
     <div class="grid">
-      <div class="card"><small>Pemasukan hari ini</small><b>${rp(masuk)}</b></div>
-      <div class="card"><small>Pengeluaran hari ini</small><b>${rp(keluar)}</b></div>
+      <div class="card in"><small>Pemasukan hari ini</small><b>${rp(masuk)}</b></div>
+      <div class="card out"><small>Pengeluaran hari ini</small><b>${rp(keluar)}</b></div>
       <div class="card hi"><small>Selisih</small><b>${rp(masuk - keluar)}</b></div>
       <div class="card hi"><small>Laba penjualan</small><b>${rp(laba)}</b></div>
     </div>
@@ -107,8 +107,8 @@ async function home() {
       data: {
         labels: hari7.map(d => d.slice(8) + '/' + d.slice(5, 7)),
         datasets: [
-          { label: 'Pemasukan', backgroundColor: '#22a55a', borderRadius: 6, data: hari7.map(d => sum(jual.filter(r => r.tanggal === d), r => r.qty * r.harga_satuan)) },
-          { label: 'Pengeluaran', backgroundColor: '#bbf7d0', borderRadius: 6, data: hari7.map(d => sum(beli.filter(r => r.tanggal === d), r => r.total_harga)) }
+          { label: 'Pemasukan', backgroundColor: '#238845', borderRadius: 6, data: hari7.map(d => sum(jual.filter(r => r.tanggal === d), r => r.qty * r.harga_satuan)) },
+          { label: 'Pengeluaran', backgroundColor: '#A1D99B', borderRadius: 6, data: hari7.map(d => sum(beli.filter(r => r.tanggal === d), r => r.total_harga)) }
         ]
       },
       options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } }
@@ -141,17 +141,17 @@ async function beli() {
 
   const form = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
-    : `<div class="box"><h3>Beli bahan</h3>
-        <select id="bb">${bahan.length ? bahan.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.satuan)})</option>`).join('') : '<option value="">Tambah bahan dulu di bawah</option>'}</select>
-        <input id="bq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah">
-        <input id="bt" type="number" inputmode="numeric" min="0" placeholder="Total harga (Rp)">
-        <select id="bm"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="transfer">Transfer</option></select>
-        <input id="bd" type="date" value="${iso(new Date())}">
+    : `${tabBar(['Beli bahan', 'Bahan baru'])}<div class="box pane c1" data-t="0"><h3>Beli bahan</h3>
+        <label>Pilih bahan</label><select id="bb">${bahan.length ? bahan.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.satuan)})</option>`).join('') : '<option value="">Tambah bahan dulu di bawah</option>'}</select>
+        <label>Jumlah dibeli</label><input id="bq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah">
+        <label>Total harga (Rp)</label><input id="bt" type="number" inputmode="numeric" min="0" placeholder="Total harga (Rp)">
+        <label>Metode pembayaran</label><select id="bm"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="transfer">Transfer</option></select>
+        <label>Tanggal</label><input id="bd" type="date" value="${iso(new Date())}">
         <button class="btn" id="sB">Simpan pembelian</button></div>
-      <div class="box"><h3>Tambah bahan baru</h3>
-        <input id="nn" placeholder="Nama bahan">
-        <input id="ns" placeholder="Satuan (kg, liter, pcs)">
-        <select id="nt"><option value="otomatis">Otomatis (berkurang saat produksi)</option><option value="manual">Manual (dikurangi lewat penyesuaian)</option></select>
+      <div class="box pane c2" data-t="1"><h3>Tambah bahan baru</h3>
+        <label>Nama bahan</label><input id="nn" placeholder="Nama bahan">
+        <label>Satuan</label><input id="ns" placeholder="Satuan (kg, liter, pcs)">
+        <label>Tipe bahan</label><select id="nt"><option value="otomatis">Otomatis (berkurang saat produksi)</option><option value="manual">Manual (dikurangi lewat penyesuaian)</option></select>
         <button class="btn" id="sN">Tambah bahan</button></div>`;
 
   $('#view').innerHTML = form + `
@@ -161,6 +161,7 @@ async function beli() {
     <div class="box"><h3>Pembelian terakhir</h3>
       ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.bahan?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} ${esc(x.bahan?.satuan)}</small></span><b>${rp(x.total_harga)}</b></div>`).join('') : '<div class="kosong">Belum ada pembelian.</div>'}
     </div>`;
+  initTabs('beli');
   if (admin) return;
 
   $('#sB').onclick = async () => {
@@ -201,19 +202,19 @@ async function produksi() {
 
   const forms = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
-    : `<div class="box"><h3>Catat produksi</h3>
-        <select id="pp">${optP}</select>
-        <input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
-        <input id="pd" type="date" value="${iso(new Date())}">
+    : `${tabBar(['Catat produksi', 'Produk baru', 'Resep'])}<div class="box pane c1" data-t="0"><h3>Catat produksi</h3>
+        <label>Pilih produk</label><select id="pp">${optP}</select>
+        <label>Jumlah diproduksi</label><input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
+        <label>Tanggal</label><input id="pd" type="date" value="${iso(new Date())}">
         <button class="btn" id="sP">Simpan produksi</button></div>
-      <div class="box"><h3>Tambah produk</h3>
-        <input id="np" placeholder="Nama produk">
-        <input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
+      <div class="box pane c2" data-t="1"><h3>Tambah produk</h3>
+        <label>Nama produk</label><input id="np" placeholder="Nama produk">
+        <label>Harga jual (Rp)</label><input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
         <button class="btn" id="sNP">Tambah produk</button></div>
-      <div class="box"><h3>Isi resep (per 1 produk)</h3>
-        <select id="rp">${optP}</select>
-        <select id="rb">${optB}</select>
-        <input id="rt" type="number" inputmode="decimal" step="any" min="0" placeholder="Takaran bahan">
+      <div class="box pane c3" data-t="2"><h3>Isi resep (per 1 produk)</h3>
+        <label>Pilih produk</label><select id="rp">${optP}</select>
+        <label>Pilih bahan</label><select id="rb">${optB}</select>
+        <label>Takaran bahan per 1 produk</label><input id="rt" type="number" inputmode="decimal" step="any" min="0" placeholder="Takaran bahan">
         <button class="btn" id="sR">Simpan resep</button></div>`;
 
   $('#view').innerHTML = forms + `
@@ -226,6 +227,7 @@ async function produksi() {
     <div class="box"><h3>Produksi terakhir</h3>
       ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · modal ${rp(x.hpp_satuan)}/pcs</small></span><b>${x.qty}</b></div>`).join('') : '<div class="kosong">Belum ada produksi.</div>'}
     </div>`;
+  initTabs('produksi');
   if (admin) return;
 
   $('#sP').onclick = async () => {
@@ -249,4 +251,19 @@ async function produksi() {
     if (error) return toast(error.message);
     toast('Resep tersimpan'); produksi();
   };
+}
+
+// ===== Tab di dalam halaman (satu tugas per layar) =====
+const tabAktif = {};
+const tabBar = n => `<div class="tabs">${n.map((x, i) => `<button data-i="${i}">${x}</button>`).join('')}</div>`;
+function initTabs(key) {
+  const bs = document.querySelectorAll('.tabs button'), ps = document.querySelectorAll('.pane');
+  if (!bs.length) return;
+  const go = i => {
+    tabAktif[key] = i;
+    bs.forEach(b => b.classList.toggle('on', +b.dataset.i === i));
+    ps.forEach(p => p.hidden = +p.dataset.t !== i);
+  };
+  bs.forEach(b => b.onclick = () => go(+b.dataset.i));
+  go(tabAktif[key] || 0);
 }
