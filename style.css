@@ -100,12 +100,9 @@ nav button.on svg{stroke-width:1.8}
 /* ===== Logo, splash, nama toko ===== */
 #splash{position:fixed;inset:0;z-index:100;background:#315d44 url(splash.jpg) center/contain no-repeat;transition:opacity .5s}
 #splash.off{opacity:0;pointer-events:none}
-#login{max-width:none;margin:0;padding:28px;align-items:center;background:#315d44}
+#login{max-width:none;margin:0;padding:28px;align-items:center;background:#fff}
 .lw{width:100%;max-width:380px}
-.biglogo{height:110px;width:auto;display:block;margin:0 auto 30px}
-#login input{border:0}
-#login #err{color:#FFB199}
-#login .btn{background:#EEEDE9;color:#2b3a2e}
+.biglogo{height:96px;width:auto;display:block;margin:0 auto 14px}
 .hl{display:flex;align-items:center;gap:10px;min-width:0}
 .hlogo{height:34px;width:auto;flex:none}
 #toko{font-weight:800;font-size:20px;letter-spacing:.2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -159,3 +156,8 @@ details.pw summary{cursor:pointer;color:#3D5C42;font-weight:600;font-size:14px;p
 .rl b{font-size:13px}
 .rl button{border:0;background:none;font-size:26px;color:#BF5240;line-height:1}
 #eds{margin-top:6px}
+
+/* ===== Login putih ===== */
+.brand h1{color:#3D5C42;font-weight:800}
+.gw{display:block;margin-top:10px;font-size:12px;font-weight:700;letter-spacing:.5px;color:#5d6b5f}
+.gw i{font-style:normal;font-weight:400}
