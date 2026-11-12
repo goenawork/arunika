@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ARUNIKA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<section id="login" hidden>
+  <div class="brand"><div class="logo">A</div><h1>ARUNIKA</h1><p>Manage Better. Grow Further.</p></div>
+  <form id="f">
+    <input id="em" type="email" placeholder="Email" required autocomplete="username">
+    <input id="pw" type="password" placeholder="Password" required autocomplete="current-password">
+    <div id="err"></div>
+    <button class="btn">Masuk</button>
+  </form>
+</section>
+
+<section id="app" hidden>
+  <header>
+    <div><b class="hb">ARUNIKA</b><small id="toko"></small></div>
+    <button id="out" title="Keluar">Keluar</button>
+  </header>
+  <main>
+    <select id="pilih" hidden></select>
+    <div id="view"></div>
+  </main>
+  <nav>
+    <button data-p="home" class="on">Beranda</button>
+    <button data-p="beli">Beli</button>
+    <button data-p="produksi">Produksi</button>
+    <button data-p="jual">Jual</button>
+    <button data-p="stok">Stok</button>
+  </nav>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
