@@ -666,3 +666,10 @@ function modalSheet(list) {
     simpan: async () => { const j = +$('#e1').value; if (!(j > 0)) return 'Isi jumlah budget'; const { error } = await db.from('modal').insert({ jumlah: j, catatan: $('#e2').value.trim() || null, tanggal: $('#e3').value }); return error && error.message; }
   });
 }
+
+// ===== PWA: daftar service worker + tombol pasang =====
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+let pwaEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pwaEvt = e; $('#pasang').hidden = false; });
+$('#pasang').onclick = async () => { if (!pwaEvt) return; pwaEvt.prompt(); await pwaEvt.userChoice; pwaEvt = null; $('#pasang').hidden = true; };
+window.addEventListener('appinstalled', () => { $('#pasang').hidden = true; });
