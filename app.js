@@ -40,7 +40,7 @@ async function enter() {
 }
 
 let cur = 'home';
-const HALAMAN = { home, beli, produksi, jual };
+const HALAMAN = { home, beli, produksi, jual, stok };
 const buka = (p, label) => { cur = p; (HALAMAN[p] || (() => soon(label)))(); };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
@@ -322,3 +322,65 @@ async function jual() {
 const tagMargin = x => (x.hpp_rata <= 0 || x.harga_jual <= 0) ? ''
   : x.hpp_rata >= x.harga_jual ? '<span class="tag bad">Rugi</span>'
   : x.hpp_rata > x.harga_jual * 0.7 ? '<span class="tag warn">Margin tipis</span>' : '';
+
+// ===== Halaman STOK (stok bahan, stok produk, penyesuaian) =====
+async function stok() {
+  charts.forEach(c => c.destroy()); charts = [];
+  const admin = me.role === 'admin';
+  const f = (t, k, c, opt) => {
+    let x = db.from(t).select(k);
+    if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter);
+    return x.order(c, opt || {});
+  };
+  const [b, p, h] = await Promise.all([
+    f('bahan', 'id,nama,satuan,tipe,stok,harga_rata', 'nama'),
+    f('produk', 'id,nama,harga_jual,stok,hpp_rata', 'nama'),
+    f('penyesuaian', 'tanggal,qty,nilai,alasan,bahan(nama,satuan),produk(nama)', 'created_at', { ascending: false }).limit(10)
+  ]);
+  const bahan = b.data || [], produk = p.data || [], riwayat = h.data || [];
+  const sum = (a, fn) => a.reduce((s, r) => s + fn(r), 0);
+  const habis = x => x.stok <= 0 ? '<span class="tag warn">Habis</span>' : '';
+
+  const paneBahan = `<div class="box pane c1" data-t="0"><h3>Stok bahan</h3>
+    <div class="total">Nilai persediaan: ${rp(sum(bahan, x => x.stok * x.harga_rata))}</div>
+    ${bahan.length ? bahan.map(x => `<div class="row"><span>${esc(x.nama)}${habis(x)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}</div>`;
+  const paneProduk = `<div class="box pane c2" data-t="1"><h3>Stok produk (belum terjual)</h3>
+    <div class="total">Modal tertahan: ${rp(sum(produk, x => x.stok * x.hpp_rata))}</div>
+    ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}</div>`;
+  const paneAdj = admin ? '' : `
+    <div class="box pane c3" data-t="2"><h3>Catat penyesuaian</h3>
+      <div class="note">Untuk bahan manual yang terpakai, atau bahan/produk yang rusak, basi, dan dibuang. Stok berkurang dan nilai modalnya tercatat sebagai kerugian.</div>
+      <label>Jenis</label>
+      <select id="sj"><option value="bahan">Bahan baku</option><option value="produk">Produk jadi</option></select>
+      <label>Pilih item</label><select id="si"></select>
+      <label>Jumlah yang berkurang</label>
+      <input id="sq" type="number" inputmode="decimal" step="any" min="0" placeholder="Contoh: 2">
+      <label>Alasan</label>
+      <input id="sa" placeholder="Contoh: tumpah, basi, terpakai">
+      <label>Tanggal</label>
+      <input id="sd" type="date" value="${iso(new Date())}">
+      <button class="btn" id="sS">Simpan penyesuaian</button></div>
+    <div class="box pane c3" data-t="2"><h3>Penyesuaian terakhir</h3>
+      ${riwayat.length ? riwayat.map(x => { const n = x.bahan || x.produk; return `<div class="row"><span>${esc(n?.nama)}<br><small>${x.tanggal} · -${x.qty}${x.bahan ? ' ' + esc(x.bahan.satuan) : ''} · ${esc(x.alasan)}</small></span><b class="neg">${rp(x.nilai)}</b></div>`; }).join('') : '<div class="kosong">Belum ada penyesuaian.</div>'}</div>`;
+
+  $('#view').innerHTML = tabBar(admin ? ['Stok bahan', 'Stok produk'] : ['Stok bahan', 'Stok produk', 'Penyesuaian']) + paneBahan + paneProduk + paneAdj;
+  initTabs('stok');
+  if (admin) return;
+
+  const isi = () => {
+    const j = $('#sj').value, arr = j === 'bahan' ? bahan : produk;
+    $('#si').innerHTML = arr.length
+      ? arr.map(x => `<option value="${x.id}">${esc(x.nama)} (stok ${+x.stok.toFixed(2)}${j === 'bahan' ? ' ' + esc(x.satuan) : ''})</option>`).join('')
+      : '<option value="">Belum ada data</option>';
+  };
+  $('#sj').onchange = isi; isi();
+
+  $('#sS').onclick = async () => {
+    const qty = +$('#sq').value, j = $('#sj').value, id = $('#si').value, alasan = $('#sa').value.trim();
+    if (!id || qty <= 0) return toast('Pilih item dan isi jumlah');
+    if (!alasan) return toast('Isi alasan penyesuaian');
+    const { error } = await db.rpc('catat_penyesuaian', { p_qty: qty, p_alasan: alasan, p_bahan: j === 'bahan' ? id : null, p_produk: j === 'produk' ? id : null, p_tanggal: $('#sd').value });
+    if (error) return toast(error.message);
+    toast('Penyesuaian tersimpan'); stok();
+  };
+}
