@@ -1,4 +1,4 @@
-:root{--g1:#0b6b3a;--g2:#22a55a;--g3:#3ecf8e;--g4:#bbf7d0;--tx:#10281c;--mu:#5b6f64;--bd:#e3efe8}
+:root{--g1:#00441B;--g2:#238845;--g3:#41AB5D;--g4:#74C476;--tx:#0f2417;--mu:#4f6b58;--bd:#C7E9C0}
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#fff;color:var(--tx);padding-bottom:84px}
 [hidden]{display:none!important}
@@ -40,3 +40,26 @@ nav button.on{color:#fff;background:linear-gradient(135deg,var(--g1),var(--g3));
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#10281c;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%;text-align:center}
 .note{background:#effcf4;border:1px solid var(--bd);border-radius:12px;padding:10px;font-size:13px;margin-bottom:14px}
 .row small{color:var(--mu);display:block;font-size:12px}
+
+/* ===== Revisi tampilan: palet Greens, label, tab, bagian berwarna ===== */
+body{background:#F7FCF5}
+.box{background:#fff;border-color:#E5F5E0}
+.card{border-color:#E5F5E0}
+.card.in{background:#E5F5E0;border-color:#C7E9C0}
+.card.out{background:#fff;border-left:5px solid #74C476}
+.card.hi{background:linear-gradient(135deg,#00441B,#238845 70%,#41AB5D)}
+label{display:block;font-size:12px;font-weight:600;color:#006D2C;margin:6px 0 4px}
+input:focus,select:focus{outline:2px solid #41AB5D;border-color:#41AB5D}
+
+.tabs{display:flex;gap:6px;background:#E5F5E0;padding:4px;border-radius:14px;margin-bottom:12px}
+.tabs button{flex:1;border:0;background:none;padding:10px 4px;border-radius:11px;font-size:13px;color:#006D2C;font-weight:600}
+.tabs button.on{background:#fff;color:#00441B;box-shadow:0 1px 4px rgba(0,68,27,.18)}
+
+.pane{border-top-width:6px}
+.pane.c1{border-top-color:#00441B}.pane.c1 .btn{background:linear-gradient(135deg,#00441B,#238845)}
+.pane.c2{border-top-color:#41AB5D}.pane.c2 .btn{background:linear-gradient(135deg,#238845,#41AB5D)}
+.pane.c3{border-top-color:#74C476}.pane.c3 .btn{background:linear-gradient(135deg,#41AB5D,#74C476);color:#00300f}
+.pane .btn{margin-top:14px}
+.box h3{color:#00441B}
+.row{border-color:#E5F5E0}
+.row b{color:#006D2C}
