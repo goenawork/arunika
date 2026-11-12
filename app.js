@@ -40,7 +40,7 @@ async function enter() {
 }
 
 let cur = 'home';
-const HALAMAN = { home, beli, produksi };
+const HALAMAN = { home, beli, produksi, jual };
 const buka = (p, label) => { cur = p; (HALAMAN[p] || (() => soon(label)))(); };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
@@ -266,4 +266,54 @@ function initTabs(key) {
   };
   bs.forEach(b => b.onclick = () => go(+b.dataset.i));
   go(tabAktif[key] || 0);
+}
+
+// ===== Halaman JUAL (catat penjualan) =====
+async function jual() {
+  charts.forEach(c => c.destroy()); charts = [];
+  const admin = me.role === 'admin';
+  const f = (t, k, c, opt) => {
+    let x = db.from(t).select(k);
+    if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter);
+    return x.order(c, opt || {});
+  };
+  const [pr, hs] = await Promise.all([
+    f('produk', 'id,nama,harga_jual,stok', 'nama'),
+    f('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)', 'created_at', { ascending: false }).limit(15)
+  ]);
+  const produk = pr.data || [], riwayat = hs.data || [];
+
+  const form = admin
+    ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
+    : `<div class="box pane c1"><h3>Catat penjualan</h3>
+        <label>Pilih produk</label>
+        <select id="jp">${produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)} (stok ${+x.stok.toFixed(2)})</option>`).join('') : '<option value="">Belum ada produk</option>'}</select>
+        <label>Jumlah terjual</label>
+        <input id="jq" type="number" inputmode="decimal" step="any" min="0" placeholder="Contoh: 3">
+        <label>Harga satuan (Rp)</label>
+        <input id="jh" type="number" inputmode="numeric" min="0">
+        <label>Metode pembayaran</label>
+        <select id="jm"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="transfer">Transfer</option></select>
+        <label>Tanggal</label>
+        <input id="jd" type="date" value="${iso(new Date())}">
+        <div class="total" id="jt">Total: Rp0</div>
+        <button class="btn" id="sJ">Simpan penjualan</button></div>`;
+
+  $('#view').innerHTML = form + `
+    <div class="box"><h3>Penjualan terakhir</h3>
+      ${riwayat.length ? riwayat.map(x => `<div class="row"><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · ${x.metode.toUpperCase()} · ${x.qty} × ${rp(x.harga_satuan)}<br>Laba ${rp(x.qty * (x.harga_satuan - x.hpp_satuan))}</small></span><b>${rp(x.qty * x.harga_satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan.</div>'}
+    </div>`;
+  if (admin) return;
+
+  const hitung = () => { $('#jt').textContent = 'Total: ' + rp((+$('#jq').value || 0) * (+$('#jh').value || 0)); };
+  const pilih = () => { const x = produk.find(y => y.id === $('#jp').value); $('#jh').value = x ? x.harga_jual : ''; hitung(); };
+  $('#jp').onchange = pilih; $('#jq').oninput = hitung; $('#jh').oninput = hitung; pilih();
+
+  $('#sJ').onclick = async () => {
+    const qty = +$('#jq').value;
+    if (!$('#jp').value || qty <= 0 || $('#jh').value === '') return toast('Pilih produk, isi jumlah dan harga');
+    const { error } = await db.rpc('catat_penjualan', { p_produk: $('#jp').value, p_qty: qty, p_metode: $('#jm').value, p_harga: +$('#jh').value, p_tanggal: $('#jd').value });
+    if (error) return toast(error.message);
+    toast('Penjualan tersimpan'); jual();
+  };
 }
