@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#315d44">
+<meta name="theme-color" content="#82498B">
 <title>ARUNIKA</title>
 <link rel="icon" href="logo.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -12,28 +12,23 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ARUNIKA">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="splash"></div>
-<script>try{if(sessionStorage.getItem('sp')){document.getElementById('splash').remove()}else{sessionStorage.setItem('sp','1')}}catch(e){}</script>
 
 <section id="login" hidden>
   <div class="lw">
-    <div class="brand">
-      <img src="logo.png" class="biglogo" alt="Logo">
-      <h1>ARUNIKA</h1>
-      <p>Manage Better. Grow Further.</p>
-    </div>
-
+    <div class="brand"><img src="logo.png" class="biglogo" alt="Logo"><h1>ARUNIKA</h1><p>Manage Better. Grow Further.</p></div>
     <form id="f">
       <input id="em" type="email" placeholder="Email" required autocomplete="username">
       <input id="pw" type="password" placeholder="Kata sandi" required autocomplete="current-password">
       <div id="err"></div>
       <button class="btn">Masuk</button>
+      <span class="gw">Goena<i>work</i></span>
     </form>
-
-    <span class="gw">Goena<i>work</i></span>
   </div>
 </section>
 
@@ -50,7 +45,7 @@
   <nav>
     <button data-p="home" class="on" aria-label="Beranda"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg><span>Beranda</span></button>
     <button data-p="beli" aria-label="Beli"><svg viewBox="0 0 24 24"><path d="M3 4h2.5l2 11h10.5l2-8H6.5"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span>Beli</span></button>
-    <button data-p="produksi" aria-label="Produksi"><svg viewBox="0 0 24 24"><path d="M3 20V9l6 4V9l6 4V5h3v15z"/><path d="M6 17h2M11 17h2"/></svg><span>Produksi</span></button>
+    <button data-p="produksi" aria-label="Produk"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Produk</span></button>
     <button data-p="jual" aria-label="Jual"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9.5v.01M18 14.5v.01"/></svg><span>Jual</span></button>
     <button data-p="stok" aria-label="Stok"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Stok</span></button>
   </nav>
@@ -58,21 +53,29 @@
 
 <div id="sheet" hidden>
   <div class="sh">
-    <button id="tutup" aria-label="Tutup">&times;</button>
-    <div class="avbig" id="avb"></div>
-    <label class="ganti">Ganti foto<input id="fto" type="file" accept="image/*" hidden></label>
-    <label>Nama toko</label>
-    <input id="pn" maxlength="40">
-    <p class="info" id="pi"></p>
-    <button class="btn" id="spn">Simpan</button>
-    <details class="pw"><summary>Ganti kata sandi</summary>
-      <label>Kata sandi lama</label><input id="pw0" type="password" autocomplete="current-password">
-      <label>Kata sandi baru (minimal 8 karakter)</label><input id="pw1" type="password" autocomplete="new-password">
-      <label>Ulangi kata sandi baru</label><input id="pw2" type="password" autocomplete="new-password">
-      <button class="btn" id="spw">Ubah kata sandi</button>
-    </details>
-    <button class="btn2" id="pasang" hidden>Pasang di layar utama</button>
-    <button class="out" id="keluar">Keluar</button>
+    <div class="shh"><b>Profil &amp; Pengaturan</b><button id="tutup" aria-label="Tutup">&times;</button></div>
+    <div class="sbd">
+      <div class="pcard"><div class="avbig" id="avb"></div><div><span class="chip" id="cd-role"></span><b id="cd-nama"></b><small id="cd-email"></small></div></div>
+      <div class="kvbox">
+        <div class="kv"><span>Toko aktif</span><b id="si-toko"></b></div>
+        <div class="kv"><span>Peran</span><b id="si-peran"></b></div>
+        <div class="kv"><span>Anggota sejak</span><b id="si-sejak"></b></div>
+        <div class="kv"><span>Status data</span><b id="si-status"></b></div>
+      </div>
+      <details class="pw"><summary>Ubah nama toko dan foto</summary>
+        <label class="ganti">Ganti foto<input id="fto" type="file" accept="image/*" hidden></label>
+        <label>Nama toko</label><input id="pn" maxlength="40">
+        <button class="btn" id="spn">Simpan</button>
+      </details>
+      <details class="pw"><summary>Ganti kata sandi</summary>
+        <label>Kata sandi lama</label><input id="pw0" type="password" autocomplete="current-password">
+        <label>Kata sandi baru (minimal 8 karakter)</label><input id="pw1" type="password" autocomplete="new-password">
+        <label>Ulangi kata sandi baru</label><input id="pw2" type="password" autocomplete="new-password">
+        <button class="btn" id="spw">Ubah kata sandi</button>
+      </details>
+      <button class="btn2" id="pasang" hidden>Pasang di layar utama</button>
+    </div>
+    <div class="sft"><button class="out" id="keluar">Keluar dari Akun</button><div class="gw2">ARUNIKA by <b>Goenawork</b></div></div>
   </div>
 </div>
 
