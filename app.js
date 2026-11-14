@@ -39,7 +39,7 @@ async function enter() {
 
 let cur = 'home';
 const HALAMAN = { home, beli, produksi, jual, stok };
-const buka = (p, label) => { cur = p; (HALAMAN[p] || (() => soon(label)))(); };
+const buka = (p, label) => { cur = p; $('#tokobar').hidden = p === 'home'; (HALAMAN[p] || (() => soon(label)))(); };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
   buka(b.dataset.p, b.textContent);
@@ -375,78 +375,6 @@ function rentangDash(p) {
   if (p === 'minggu') return [iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (t.getDay() + 6) % 7)), e];
   return [iso(new Date(t.getFullYear(), t.getMonth(), 1)), e];
 }
-async function home() {
-  const hari = tglDash, suf = hari === iso(new Date()) ? 'hari ini' : fmt(hari);
-  const awal = [rentangDash('bulan')[0], rentangDash('minggu')[0], hari].sort()[0];
-  const q = (t, k) => { const x = db.from(t).select(k).gte('tanggal', awal); return tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x; };
-  let qp = db.from('produk').select('nama,stok'); if (tokoFilter !== 'all') qp = qp.eq('toko_id', tokoFilter);
-  let qm = db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', rentangDash('bulan')[0]); if (tokoFilter !== 'all') qm = qm.eq('toko_id', tokoFilter);
-  const [j, b, p, m] = await Promise.all([q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)'), q('pembelian', 'tanggal,total_harga,metode'), qp, qm]);
-  const jual = j.data || [], beli = b.data || [], produk = p.data || [];
-  const sum = (a, f) => a.reduce((s, r) => s + f(r), 0), masukR = r => r.qty * r.harga_satuan;
-  const jH = jual.filter(r => r.tanggal === hari), bH = beli.filter(r => r.tanggal === hari);
-  const masuk = sum(jH, masukR), keluar = sum(bH, r => r.total_harga), laba = sum(jH, r => r.qty * (r.harga_satuan - r.hpp_satuan));
-  const terjual = sum(jH, r => +r.qty), sisa = sum(produk, r => +r.stok);
-  const agg = {}; jH.forEach(r => { const n = r.produk?.nama || '-'; agg[n] = agg[n] || { q: 0, t: 0 }; agg[n].q += +r.qty; agg[n].t += masukR(r); });
-  const terjualList = Object.entries(agg).sort((a, b) => b[1].q - a[1].q);
-  const kartu = (c, l, v, fl) => `<div class="card ${c}"><small>${l}</small><b>${v}</b>${fl ? `<span class="flag">${fl}</span>` : ''}</div>`;
-  const habis = produk.length && sisa <= 0;
-  const modalList = m.data || [], budget = sum(modalList, r => +r.jumlah), pakai = sum(beli.filter(r => r.tanggal >= rentangDash('bulan')[0]), r => r.total_harga);
-  const pct = budget > 0 ? pakai / budget * 100 : 0, sisaB = budget - pakai, wb = pct > 100 ? 'bad' : pct >= 80 ? 'warn' : '';
-  const ket0 = !budget ? 'Belum ada budget bulan ini' : pct > 100 ? 'Budget terlampaui' : pct >= 80 ? 'Mendekati batas budget' : '';
-
-  $('#view').innerHTML = `
-    <div class="bar"><div class="tgw"><button class="tgb" type="button">${new Date(hari + 'T00:00').toLocaleDateString('id-ID', { dateStyle: 'full' })} &#9662;</button><input type="date" id="tgl" value="${hari}" max="${iso(new Date())}"></div><button class="lapbtn" id="bl">Laporan</button></div>
-    <div class="grid">
-      ${kartu('in', `Pemasukan ${suf}`, rp(masuk))}
-      ${kartu(keluar > masuk ? 'warn' : 'out', `Pengeluaran ${suf}`, rp(keluar), keluar > masuk ? 'Lebih besar dari pemasukan' : '')}
-      ${kartu(masuk - keluar < 0 ? 'bad' : 'hi', 'Selisih', rp(masuk - keluar), masuk - keluar < 0 ? 'Defisit' : '')}
-      ${kartu(laba < 0 ? 'bad' : 'hi', 'Laba penjualan', rp(laba), laba < 0 ? 'Penjualan di bawah modal' : '')}
-      ${kartu('', `Produk terjual ${suf}`, +terjual.toFixed(2))}
-      ${kartu(habis ? 'warn' : '', 'Produk tersisa', +sisa.toFixed(2), habis ? 'Stok produk habis' : '')}
-    </div>
-    <div class="box"><div class="hd"><h3>Budget bahan baku bulan ini</h3>${me.role === 'admin' ? '' : '<button class="lapbtn" id="bb">+ Tambah</button>'}</div>
-      <div class="prog"><i class="${wb}" style="width:${Math.min(100, pct)}%"></i></div>
-      <div class="row"><span>Terpakai</span><b>${rp(pakai)}</b></div>
-      <div class="row"><span>Budget</span><b>${rp(budget)}</b></div>
-      <div class="row"><span>Sisa budget</span><b class="${sisaB < 0 ? 'neg' : ''}">${rp(sisaB)}</b></div>
-      ${ket0 ? `<span class="flag ${wb}">${ket0}</span>` : ''}</div>
-    <div class="box"><div class="hd"><h3>Metode pembayaran</h3>
-      <div class="seg" id="seg">${[['hari', hari === iso(new Date()) ? 'Hari ini' : fmt(hari)], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div></div>
-      <div id="gr"></div></div>
-    <div class="box"><h3>Produk terjual ${suf}</h3>
-      ${terjualList.length ? terjualList.map(([n, v]) => `<div class="row"><span>${esc(n)}<br><small>${rp(v.t)}</small></span><b>${+v.q.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan pada tanggal ini.</div>'}
-    </div>
-    <div class="box"><h3>Sisa produk belum terjual</h3>
-      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
-    </div>`;
-
-  const gambar = () => {
-    document.querySelectorAll('#seg button').forEach(x => { x.classList.toggle('on', x.dataset.k === periodeGrafik); x.onclick = () => { periodeGrafik = x.dataset.k; gambar(); }; });
-    const [a, z] = rentangDash(periodeGrafik), ada = r => r.tanggal >= a && r.tanggal <= z;
-    const js = jual.filter(ada), bs = beli.filter(ada);
-    const pm = METODE.map(m => ({ masuk: sum(js.filter(r => r.metode === m), masukR), keluar: sum(bs.filter(r => r.metode === m), r => r.total_harga) }));
-    const tot = sum(pm, x => x.masuk);
-    $('#gr').innerHTML = `<div class="dn"><div class="dc"><canvas id="c1"></canvas></div>
-      <div class="lg">${pm.map((x, i) => `<div><i style="background:${WARNA_M[i]}"></i><span>${NAMA_M[i]}<small>${tot ? Math.round(x.masuk / tot * 100) : 0}%</small></span><b>${rp(x.masuk)}</b></div>`).join('')}</div></div>
-      <h4>Pemasukan vs pengeluaran${periodeGrafik === 'hari' ? ' per metode' : ' per hari'}</h4><canvas id="c2" height="190"></canvas>`;
-    let lb, dm, dk;
-    if (periodeGrafik === 'hari') { lb = NAMA_M; dm = pm.map(x => x.masuk); dk = pm.map(x => x.keluar); }
-    else {
-      const hr = []; for (let d = new Date(a + 'T00:00'); iso(d) <= z; d.setDate(d.getDate() + 1)) hr.push(iso(d));
-      lb = hr.map(d => d.slice(8) + '/' + d.slice(5, 7));
-      dm = hr.map(d => sum(js.filter(r => r.tanggal === d), masukR)); dk = hr.map(d => sum(bs.filter(r => r.tanggal === d), r => r.total_harga));
-    }
-    charts.forEach(c => c.destroy());
-    charts = [
-      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
-      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#E8B64A', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
-    ];
-  };
-  gambar();
-  $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
-  if ($('#bb')) $('#bb').onclick = () => modalSheet(modalList);
-}
 
 // ===== KATA SANDI =====
 $('#spw').onclick = async () => {
@@ -605,6 +533,7 @@ const bt = (t, id) => me.role === 'admin' ? '' : ` data-bt="${t}" data-id="${id}
 const ket = e => e.code === '23503' ? 'Tidak bisa dihapus karena sudah dipakai transaksi atau resep. Cukup ubah namanya bila perlu.' : e.message;
 
 function bukaEdit(o) {
+  chartsD.forEach(c => c.destroy()); chartsD = [];
   $('#edj').textContent = o.judul; $('#edf').innerHTML = o.html; $('#ed').hidden = false;
   $('#eds').hidden = !o.simpan; $('#edh').hidden = !o.hapus; $('#edh').textContent = o.lbl || 'Hapus';
   const selesai = async (fn, pesan) => { const err = await fn(); if (err) return toast(err); $('#ed').hidden = true; toast(pesan); buka(cur, ''); };
@@ -673,3 +602,175 @@ let pwaEvt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pwaEvt = e; $('#pasang').hidden = false; });
 $('#pasang').onclick = async () => { if (!pwaEvt) return; pwaEvt.prompt(); await pwaEvt.userChoice; pwaEvt = null; $('#pasang').hidden = true; };
 window.addEventListener('appinstalled', () => { $('#pasang').hidden = true; });
+
+// ===== RESET DATA TOKO (khusus admin) =====
+function resetSheet() {
+  const nama = $('#pilih').selectedOptions[0].textContent;
+  const baris = [['transaksi', 'Transaksi (penjualan, pembelian, produksi, penyesuaian). Stok kembali 0'], ['modal', 'Budget dan modal'], ['resep', 'Resep'], ['produk', 'Daftar produk'], ['bahan', 'Daftar bahan baku'], ['profil', 'Nama toko dan foto profil']];
+  bukaEdit({
+    judul: 'Reset data toko', lbl: 'Reset sekarang', okH: 'Data toko berhasil direset',
+    html: `<p class="info">Toko: <b>${esc(nama)}</b>. Data yang dihapus tidak bisa dikembalikan, jadi unduh laporan lebih dulu.</p>
+      <label class="ck"><input type="checkbox" id="rs-all"><b>Reset seluruh data (akun seperti baru)</b></label>` +
+      baris.map(([k, t]) => `<label class="ck"><input type="checkbox" data-r="${k}">${t}</label>`).join('') +
+      `<p class="info">Menghapus produk atau bahan otomatis ikut mereset transaksi dan resep.</p><label>Ketik nama toko untuk konfirmasi</label><input id="rs-n" autocomplete="off">`,
+    hapus: async () => {
+      const pilih = [...document.querySelectorAll('#edf [data-r]:checked')].map(c => c.dataset.r);
+      if (!pilih.length) return 'Pilih data yang akan direset';
+      const { error } = await db.rpc('reset_toko', { p_toko: tokoFilter, p_opsi: pilih, p_nama: $('#rs-n').value });
+      if (error) return error.message;
+      if (pilih.includes('profil')) $('#pilih').selectedOptions[0].textContent = 'Toko Baru';
+      return null;
+    }
+  });
+  const cks = [...document.querySelectorAll('#edf [data-r]')], all = $('#rs-all'), by = k => cks.find(c => c.dataset.r === k);
+  const sinkron = () => {
+    const dep = by('produk').checked || by('bahan').checked;
+    ['transaksi', 'resep'].forEach(k => { if (dep) by(k).checked = true; by(k).disabled = dep; });
+    all.checked = cks.every(c => c.checked);
+  };
+  all.onchange = () => { cks.forEach(c => { c.checked = all.checked; }); sinkron(); };
+  cks.forEach(c => { c.onchange = sinkron; });
+}
+
+// ===== BERANDA (tampilan baru) =====
+let chartsD = [];
+const svg = p => `<svg viewBox="0 0 24 24">${p}</svg>`;
+const IC = {
+  down: '<path d="M12 5v14M6 13l6 6 6-6"/>', up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  coin: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+  bar: '<path d="M5 20v-6M12 20V6M19 20v-10"/>',
+  cart: '<path d="M3 4h2.5l2 11h10.5l2-8H6.5"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/>',
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  cal: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'
+};
+const rpk = n => n >= 1e7 ? 'Rp' + (n / 1e6).toFixed(1).replace('.', ',') + 'jt' : rp(n);
+const waktu = s => { const d = new Date(s); return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':'); };
+const gabung = (j, b) => [...(j || []).map(r => ({ t: 'penjualan', id: r.id, nama: r.produk?.nama, nilai: r.qty * r.harga_satuan, w: r.created_at })), ...(b || []).map(r => ({ t: 'pembelian', id: r.id, nama: r.bahan?.nama, nilai: r.total_harga, w: r.created_at }))].sort((a, c) => c.w.localeCompare(a.w));
+const aktRow = a => { const p = a.t === 'penjualan'; return `<div class="akt"${bt(a.t, a.id)}><i class="ic ${p ? 'g' : 'o'}">${svg(p ? IC.cart : IC.box)}</i><span>${p ? 'Penjualan Produk' : 'Pengeluaran Bahan Baku'}<small>${esc(a.nama)} | ${waktu(a.w)}</small></span><b class="${p ? 'plus' : 'minus'}">${p ? '+' : '-'} ${rp(a.nilai)}</b></div>`; };
+const tren = (now, prev, naikBaik) => {
+  if (!prev) return now ? '<span class="tr">Baru</span>' : '';
+  const p = Math.round((now - prev) / Math.abs(prev) * 100);
+  if (!p) return '<span class="tr">0%</span>';
+  return `<span class="tr ${(p > 0) === naikBaik ? 'ok' : 'no'}">${p > 0 ? '&uarr; +' : '&darr; '}${p}%</span>`;
+};
+const sumX = (a, f) => a.reduce((s, r) => s + f(r), 0);
+const lgd = arr => { const t = sumX(arr, x => x); return `<div class="lg">${arr.map((v, i) => `<div><i style="background:${WARNA_M[i]}"></i><span>${NAMA_M[i]}<small>${t ? Math.round(v / t * 100) : 0}%</small></span><b>${rp(v)}</b></div>`).join('')}</div>`; };
+$('#edf').addEventListener('click', e => { const r = e.target.closest('[data-bt]'); if (r && me.role !== 'admin') batalTrx(r.dataset.bt, r.dataset.id, r.innerText.replace(/\n+/g, ' | ')); });
+
+async function home() {
+  $('#tokobar').hidden = true;
+  const hari = tglDash, hariIni = iso(new Date()), suf = hari === hariIni ? 'hari ini' : fmt(hari);
+  const pd = new Date(hari + 'T00:00'); pd.setDate(pd.getDate() - 1); const prev = iso(pd);
+  const bulanAwal = rentangDash('bulan')[0], awal = [bulanAwal, rentangDash('minggu')[0], hari, prev].sort()[0];
+  const flt = x => tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x;
+  const q = (t, k) => flt(db.from(t).select(k).gte('tanggal', awal));
+  const lat = (t, k) => flt(db.from(t).select(k)).order('created_at', { ascending: false }).limit(5);
+  const [j, b, p, m, aj, ab] = await Promise.all([
+    q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)'), q('pembelian', 'tanggal,total_harga,metode'),
+    flt(db.from('produk').select('nama,stok')), flt(db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', bulanAwal)),
+    lat('penjualan', 'id,qty,harga_satuan,created_at,produk(nama)'), lat('pembelian', 'id,total_harga,created_at,bahan(nama)')
+  ]);
+  const jual = j.data || [], beli = b.data || [], produk = p.data || [], modalList = m.data || [], sum = sumX;
+  const masukR = r => r.qty * r.harga_satuan, labaR = r => r.qty * (r.harga_satuan - r.hpp_satuan);
+  const hit = t => { const js = jual.filter(r => r.tanggal === t); return { js, m: sum(js, masukR), k: sum(beli.filter(r => r.tanggal === t), r => r.total_harga), l: sum(js, labaR) }; };
+  const H = hit(hari), P = hit(prev), masuk = H.m, keluar = H.k, laba = H.l;
+  const budget = sum(modalList, r => +r.jumlah), pakai = sum(beli.filter(r => r.tanggal >= bulanAwal), r => r.total_harga);
+  const pct = budget > 0 ? pakai / budget * 100 : 0, sisaB = budget - pakai, wb = pct > 100 ? 'bad' : pct >= 80 ? 'warn' : '';
+  const ket0 = !budget ? 'Belum ada budget bulan ini' : pct > 100 ? 'Budget terlampaui' : pct >= 80 ? 'Mendekati batas budget' : '';
+  const jB = jual.filter(r => r.tanggal >= bulanAwal), pmB = METODE.map(mt => sum(jB.filter(r => r.metode === mt), masukR)), totB = sum(pmB, x => x);
+  const agg = {}; H.js.forEach(r => { const n = r.produk?.nama || '-'; agg[n] = agg[n] || { q: 0, t: 0 }; agg[n].q += +r.qty; agg[n].t += masukR(r); });
+  const terjualList = Object.entries(agg).sort((a, c) => c[1].q - a[1].q);
+  const aktiv = gabung(aj.data, ab.data).slice(0, 5);
+  const nama = me.role === 'admin' ? 'Admin' : me.nama_toko;
+  const fc = (cls, ico, l, v, tr, fl) => `<div class="fc ${cls}"><i class="ic ${cls === 'bad' ? 'b' : cls}">${svg(ico)}</i><div><small>${l}</small><b>${v}</b>${tr || ''}${fl ? `<span class="flag">${fl}</span>` : ''}</div></div>`;
+  const prog = `<div class="prog"><i class="${wb}" style="width:${Math.min(100, pct)}%"></i></div>`;
+
+  $('#view').innerHTML = `
+    <div class="hi2"><small>Selamat datang,</small><h2>${esc(nama)} <span>&#128075;</span></h2></div>
+    <div class="bar"><div class="tgw"><button class="tgb" type="button">${svg(IC.cal)}<span>${new Date(hari + 'T00:00').toLocaleDateString('id-ID', { dateStyle: 'full' })}</span><span>&#9662;</span></button><input type="date" id="tgl" value="${hari}" max="${hariIni}"></div><button class="lapbtn" id="bl">Laporan</button></div>
+    <div class="grid">
+      ${fc('g', IC.down, `Pemasukan ${suf}`, rp(masuk), tren(masuk, P.m, true))}
+      ${keluar > masuk ? fc('bad', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false), 'Lebih besar dari pemasukan') : fc('o', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false))}
+      ${fc(masuk - keluar < 0 ? 'bad' : 'g', IC.coin, 'Selisih', rp(masuk - keluar), '', masuk - keluar < 0 ? 'Defisit' : '')}
+      ${fc(laba < 0 ? 'bad' : 'g', IC.bar, 'Laba penjualan', rp(laba), tren(laba, P.l, true), laba < 0 ? 'Penjualan di bawah modal' : '')}
+    </div>
+    <p class="cap">Persentase dibandingkan hari sebelumnya</p>
+    <div class="box"><div class="hd"><h3>Penjualan &amp; Budget</h3><button class="lnk" id="bd">Lihat Detail &rarr;</button></div>
+      <div class="dn"><div class="dc"><canvas id="hc1"></canvas><div class="mid"><b>${rpk(totB)}</b><small>Total Penjualan</small></div></div>${lgd(pmB)}</div>
+      <p class="cap2">Total penjualan bulan ini</p>
+      <div class="sep"></div>
+      <div class="bl">Budget bahan baku bulan ini</div>${prog}
+      <div class="bl2"><b>${rp(pakai)}</b> <span>/ ${rp(budget)}</span></div>
+      ${ket0 ? `<span class="flag ${wb}">${ket0}</span>` : ''}
+    </div>
+    <div class="box"><div class="hd"><h3>Aktivitas Terbaru</h3><button class="lnk" id="bs">Lihat Semua &rarr;</button></div>
+      ${aktiv.length ? aktiv.map(aktRow).join('') : '<div class="kosong">Belum ada aktivitas.</div>'}
+    </div>
+    <div class="box"><h3>Produk terjual ${suf}</h3>
+      ${terjualList.length ? terjualList.map(([n, v]) => `<div class="row"><span>${esc(n)}<br><small>${rp(v.t)}</small></span><b>${+v.q.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan pada tanggal ini.</div>'}
+    </div>
+    <div class="box"><h3>Sisa produk belum terjual</h3>
+      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
+    </div>`;
+
+  charts.forEach(c => c.destroy());
+  charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
+  $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
+  $('#bs').onclick = aktivitasSheet;
+
+  const gambar = () => {
+    document.querySelectorAll('#seg button').forEach(x => { x.classList.toggle('on', x.dataset.k === periodeGrafik); x.onclick = () => { periodeGrafik = x.dataset.k; gambar(); }; });
+    const [a, z] = rentangDash(periodeGrafik), ada = r => r.tanggal >= a && r.tanggal <= z;
+    const js = jual.filter(ada), bs = beli.filter(ada);
+    const pm = METODE.map(mt => ({ masuk: sum(js.filter(r => r.metode === mt), masukR), keluar: sum(bs.filter(r => r.metode === mt), r => r.total_harga) }));
+    const tot = sum(pm, x => x.masuk);
+    $('#gr').innerHTML = `<div class="dn"><div class="dc"><canvas id="c1"></canvas></div>${lgd(pm.map(x => x.masuk))}</div>
+      <h4>Pemasukan vs pengeluaran${periodeGrafik === 'hari' ? ' per metode' : ' per hari'}</h4><canvas id="c2" height="190"></canvas>`;
+    let lb, dm, dk;
+    if (periodeGrafik === 'hari') { lb = NAMA_M; dm = pm.map(x => x.masuk); dk = pm.map(x => x.keluar); }
+    else {
+      const hr = []; for (let d = new Date(a + 'T00:00'); iso(d) <= z; d.setDate(d.getDate() + 1)) hr.push(iso(d));
+      lb = hr.map(d => d.slice(8) + '/' + d.slice(5, 7));
+      dm = hr.map(d => sum(js.filter(r => r.tanggal === d), masukR)); dk = hr.map(d => sum(bs.filter(r => r.tanggal === d), r => r.total_harga));
+    }
+    chartsD.forEach(c => c.destroy());
+    chartsD = [
+      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
+      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#E8B64A', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
+    ];
+  };
+  $('#bd').onclick = () => {
+    bukaEdit({
+      judul: 'Detail',
+      html: `<div class="seg" id="seg">${[['hari', hari === hariIni ? 'Hari ini' : fmt(hari)], ['minggu', 'Minggu ini'], ['bulan', 'Bulan ini']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div>
+        <div id="gr"></div>
+        <h4>Budget bahan baku bulan ini</h4>${prog}
+        <div class="row"><span>Terpakai</span><b>${rp(pakai)}</b></div>
+        <div class="row"><span>Budget</span><b>${rp(budget)}</b></div>
+        <div class="row"><span>Sisa budget</span><b class="${sisaB < 0 ? 'neg' : ''}">${rp(sisaB)}</b></div>
+        ${ket0 ? `<span class="flag ${wb}">${ket0}</span>` : ''}
+        ${me.role === 'admin' ? '' : '<button class="btn2 full" id="bb2">+ Tambah budget</button>'}
+        ${me.role === 'admin' && tokoFilter !== 'all' ? '<button class="out" id="rst2">Reset data toko ini</button>' : ''}`
+    });
+    gambar();
+    if ($('#bb2')) $('#bb2').onclick = () => modalSheet(modalList);
+    if ($('#rst2')) $('#rst2').onclick = resetSheet;
+  };
+}
+
+async function aktivitasSheet() {
+  const flt = x => tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x;
+  const lat = (t, k) => flt(db.from(t).select(k)).order('created_at', { ascending: false }).limit(40);
+  const [j, b] = await Promise.all([lat('penjualan', 'id,qty,harga_satuan,created_at,produk(nama)'), lat('pembelian', 'id,total_harga,created_at,bahan(nama)')]);
+  const semua = gabung(j.data, b.data).slice(0, 60); let f = 'semua';
+  bukaEdit({
+    judul: 'Semua Aktivitas',
+    html: `<div class="seg" id="sf">${[['semua', 'Semua'], ['penjualan', 'Penjualan'], ['pembelian', 'Pembelian']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div>${me.role === 'admin' ? '' : '<p class="info">Ketuk transaksi untuk membatalkannya.</p>'}<div id="al"></div>`
+  });
+  const tampil = () => {
+    document.querySelectorAll('#sf button').forEach(x => { x.classList.toggle('on', x.dataset.k === f); x.onclick = () => { f = x.dataset.k; tampil(); }; });
+    const l = semua.filter(a => f === 'semua' || a.t === f);
+    $('#al').innerHTML = l.length ? l.map(aktRow).join('') : '<div class="kosong">Belum ada aktivitas.</div>';
+  };
+  tampil();
+}
