@@ -1,12 +1,13 @@
 // Konfigurasi Supabase ada di config.js
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif"; Chart.defaults.color = '#7a5a80';
 const $ = s => document.querySelector(s);
 const rp = n => 'Rp' + Math.round(n || 0).toLocaleString('id-ID');
 const iso = d => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD (waktu lokal)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const METODE = ['cash', 'qris', 'transfer'];
-const HIJAU = ['#3D5C42', '#6F9276', '#D2DCC4'];
+const HIJAU = ['#963396', '#BC87BC', '#EBD3EE'];
 let me = null, tokoFilter = 'all', charts = [];
 
 function show(id) { $('#login').hidden = id !== 'login'; $('#app').hidden = id !== 'app'; }
@@ -137,29 +138,29 @@ async function produksi() {
 
   const forms = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
-    : `${tabBar(['Catat produksi', 'Produk baru', 'Resep'])}<div class="box pane c1" data-t="0"><h3>Catat produksi</h3>
+    : `${tabBar(['Daftar produk', 'Resep', 'Catat produksi'])}<div class="box pane c3" data-t="2"><h3>Catat produksi</h3>
         <label>Pilih produk</label><select id="pp">${optP}</select>
         <label>Jumlah diproduksi</label><input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
         <label>Tanggal</label><input id="pd" type="date" value="${iso(new Date())}">
         <button class="btn" id="sP">Simpan produksi</button></div>
-      <div class="box pane c2" data-t="1"><h3>Tambah produk</h3>
+      <div class="box pane c1" data-t="0"><h3>Tambah produk</h3>
         <label>Nama produk</label><input id="np" placeholder="Nama produk">
         <label>Harga jual (Rp)</label><input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
         <button class="btn" id="sNP">Tambah produk</button></div>
-      <div class="box pane c3" data-t="2"><h3>Isi resep (per 1 produk)</h3>
+      <div class="box pane c2" data-t="1"><h3>Isi resep (per 1 produk)</h3>
         <label>Pilih produk</label><select id="rp">${optP}</select>
         <label>Pilih bahan</label><select id="rb">${optB}</select>
         <label>Takaran bahan per 1 produk</label><input id="rt" type="number" inputmode="decimal" step="any" min="0" placeholder="Takaran bahan">
         <button class="btn" id="sR">Simpan resep</button></div>`;
 
   $('#view').innerHTML = forms + `
-    <div class="box"><h3>Produk dan resep</h3>
+    <div class="box pane c1" data-t="0"><h3>Produk dan resep</h3>
       ${produk.length ? produk.map(x => {
         const r = resep.filter(y => y.produk_id === x.id).map(y => `${y.takaran} ${esc(y.bahan?.satuan)} ${esc(y.bahan?.nama)}`).join(', ');
         return `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
       }).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>
-    <div class="box"><h3>Produksi terakhir</h3>
+    <div class="box pane c3" data-t="2"><h3>Produksi terakhir</h3>
       ${riwayat.length ? riwayat.map(x => `<div class="row"${bt('produksi', x.id)}><span>${esc(x.produk?.nama)}<br><small>${x.tanggal} · modal ${rp(x.hpp_satuan)}/pcs</small></span><b>${x.qty}</b></div>`).join('') : '<div class="kosong">Belum ada produksi.</div>'}
     </div>`;
   initTabs('produksi');
@@ -340,11 +341,7 @@ function kecil(file) { // potong persegi 160px agar ringan disimpan
     img.onerror = gagal; img.src = URL.createObjectURL(file);
   });
 }
-$('#prof').onclick = () => {
-  $('#pn').value = me.nama_toko;
-  $('#pi').textContent = me.role === 'admin' ? 'Akun admin' : 'Akun toko';
-  $('#sheet').hidden = false;
-};
+$('#prof').onclick = () => { isiSidebar(); $('#sheet').hidden = false; };
 $('#tutup').onclick = () => { $('#sheet').hidden = true; };
 $('#sheet').onclick = e => { if (e.target.id === 'sheet') e.target.hidden = true; };
 $('#spn').onclick = async () => {
@@ -352,7 +349,7 @@ $('#spn').onclick = async () => {
   if (!nama) return toast('Nama toko tidak boleh kosong');
   const { error } = await db.from('profiles').update({ nama_toko: nama }).eq('id', me.id);
   if (error) return toast(error.message);
-  me.nama_toko = nama; $('#toko').textContent = nama; tampilAvatar();
+  me.nama_toko = nama; $('#toko').textContent = nama; tampilAvatar(); isiSidebar();
   $('#sheet').hidden = true; toast('Profil disimpan');
 };
 $('#fto').onchange = async e => {
@@ -367,7 +364,7 @@ $('#fto').onchange = async e => {
 };
 
 // ===== BERANDA (dashboard) =====
-const WARNA_M = ['#3D5C42', '#8DBF9A', '#E8B64A'], NAMA_M = ['Cash', 'QRIS', 'Transfer'];
+const WARNA_M = ['#963396', '#C8A2C8', '#ED45BB'], NAMA_M = ['Cash', 'QRIS', 'Transfer'];
 let periodeGrafik = 'hari', tglDash = iso(new Date());
 function rentangDash(p) {
   const t = new Date(), e = iso(t);
@@ -464,30 +461,30 @@ function susun(d) {
 async function buatPDF(sp) {
   for (const u of LIB.pdf) await muat(u);
   const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210;
-  doc.setFillColor(61, 92, 66); doc.rect(0, 0, W, 36, 'F');
+  doc.setFillColor(150, 51, 150); doc.rect(0, 0, W, 36, 'F');
   doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.text(sp.toko, 14, 16);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(210, 220, 198);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(235, 211, 238);
   doc.text(sp.judul, 14, 24); doc.text(sp.label, 14, 30);
   let y = 44;
   sp.kartu.forEach((k, i) => {
     const x = 14 + (i % 2) * 94; if (i && i % 2 === 0) y += 25;
-    doc.setFillColor(...(k.bad ? [251, 234, 230] : [238, 237, 233])); doc.setDrawColor(...(k.bad ? [191, 82, 64] : [210, 220, 198]));
+    doc.setFillColor(...(k.bad ? [252, 228, 234] : [243, 225, 243])); doc.setDrawColor(...(k.bad ? [179, 18, 63] : [235, 211, 238]));
     doc.roundedRect(x, y, 88, 21, 3, 3, 'FD');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(93, 107, 95); doc.text(k.l, x + 4, y + 7);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...(k.bad ? [191, 82, 64] : [61, 92, 66]));
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(122, 90, 128); doc.text(k.l, x + 4, y + 7);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...(k.bad ? [179, 18, 63] : [150, 51, 150]));
     doc.text(k.t === 'rp' ? rp(k.v) : String(k.v), x + 4, y + 16);
   });
   y += 32;
   sp.tabel.forEach(t => {
     if (y > 265) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(61, 92, 66); doc.text(t.judul, 14, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(150, 51, 150); doc.text(t.judul, 14, y);
     doc.autoTable({
       startY: y + 3, head: [t.head], theme: 'striped', margin: { left: 14, right: 14 },
       body: t.body.map(r => r.map((v, i) => t.tipe[i] === 'rp' ? rp(v) : t.tipe[i] === 'tgl' ? fmt(v) : String(v ?? ''))),
-      styles: { fontSize: 10, cellPadding: 2.6, textColor: [31, 45, 34] }, headStyles: { fillColor: [61, 92, 66], textColor: 255 },
-      alternateRowStyles: { fillColor: [238, 237, 233] },
+      styles: { fontSize: 10, cellPadding: 2.6, textColor: [59, 31, 61] }, headStyles: { fillColor: [150, 51, 150], textColor: 255 },
+      alternateRowStyles: { fillColor: [243, 225, 243] },
       columnStyles: Object.fromEntries(t.tipe.map((x, i) => [i, { halign: x === 'rp' ? 'right' : 'left' }])),
-      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [191, 82, 64]; }
+      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [179, 18, 63]; }
     });
     y = doc.lastAutoTable.finalY + 10;
   });
@@ -524,8 +521,6 @@ async function aksi(mode) {
   } catch (e) { toast('Gagal membuat laporan: ' + (e.message || 'periksa koneksi')); }
 }
 
-// ===== Splash opening =====
-setTimeout(() => { const s = $('#splash'); if (!s) return; s.classList.add('off'); setTimeout(() => s.remove(), 600); }, 1700);
 
 // ===== EDIT DATA, BATALKAN TRANSAKSI, BUDGET =====
 const ed = (t, id) => me.role === 'admin' ? '' : ` data-ed="${t}" data-id="${id}"`;
@@ -690,7 +685,7 @@ async function home() {
     <div class="bar"><div class="tgw"><button class="tgb" type="button">${svg(IC.cal)}<span>${new Date(hari + 'T00:00').toLocaleDateString('id-ID', { dateStyle: 'full' })}</span><span>&#9662;</span></button><input type="date" id="tgl" value="${hari}" max="${hariIni}"></div><button class="lapbtn" id="bl">Laporan</button></div>
     <div class="grid">
       ${fc('g', IC.down, `Pemasukan ${suf}`, rp(masuk), tren(masuk, P.m, true))}
-      ${keluar > masuk ? fc('bad', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false), 'Lebih besar dari pemasukan') : fc('o', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false))}
+      ${keluar > masuk ? fc('w', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false), 'Lebih besar dari pemasukan') : fc('o', IC.up, `Pengeluaran ${suf}`, rp(keluar), tren(keluar, P.k, false))}
       ${fc(masuk - keluar < 0 ? 'bad' : 'g', IC.coin, 'Selisih', rp(masuk - keluar), '', masuk - keluar < 0 ? 'Defisit' : '')}
       ${fc(laba < 0 ? 'bad' : 'g', IC.bar, 'Laba penjualan', rp(laba), tren(laba, P.l, true), laba < 0 ? 'Penjualan di bawah modal' : '')}
     </div>
@@ -714,7 +709,7 @@ async function home() {
     </div>`;
 
   charts.forEach(c => c.destroy());
-  charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
+  charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? WARNA_M : ['#F3E1F3'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
   $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
   $('#bs').onclick = aktivitasSheet;
 
@@ -735,8 +730,8 @@ async function home() {
     }
     chartsD.forEach(c => c.destroy());
     chartsD = [
-      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#EEEDE9'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
-      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#3D5C42', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#E8B64A', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
+      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#F3E1F3'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
+      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#963396', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#C8A2C8', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
     ];
   };
   $('#bd').onclick = () => {
@@ -773,4 +768,15 @@ async function aktivitasSheet() {
     $('#al').innerHTML = l.length ? l.map(aktRow).join('') : '<div class="kosong">Belum ada aktivitas.</div>';
   };
   tampil();
+}
+
+// ===== Isi sidebar akun =====
+function isiSidebar() {
+  const adm = me.role === 'admin';
+  $('#cd-nama').textContent = me.nama_toko; $('#cd-email').textContent = me.email || '';
+  $('#cd-role').textContent = adm ? 'ADMIN' : 'AKUN TOKO';
+  $('#si-toko').textContent = me.nama_toko; $('#si-peran').textContent = adm ? 'Admin' : 'Akun Toko';
+  $('#si-sejak').textContent = me.created_at ? fmt(me.created_at.slice(0, 10)) : '-';
+  $('#si-status').textContent = navigator.onLine ? '\u25CF Terhubung' : '\u25CF Offline';
+  $('#pn').value = me.nama_toko;
 }
