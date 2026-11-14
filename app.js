@@ -606,11 +606,11 @@ window.addEventListener('appinstalled', () => { $('#pasang').hidden = true; });
 // ===== RESET DATA TOKO (khusus admin) =====
 function resetSheet() {
   const nama = $('#pilih').selectedOptions[0].textContent;
-  const baris = [['transaksi', 'Transaksi (penjualan, pembelian, produksi, penyesuaian). Stok kembali 0'], ['modal', 'Budget dan modal'], ['resep', 'Resep'], ['produk', 'Daftar produk'], ['bahan', 'Daftar bahan baku'], ['profil', 'Nama toko dan foto profil']];
+  const baris = [['transaksi', 'Transaksi (penjualan, pembelian, produksi, penyesuaian). Stok kembali 0'], ['modal', 'Budget dan modal'], ['resep', 'Resep'], ['produk', 'Daftar produk'], ['bahan', 'Daftar bahan baku'], ['profil', 'Juga reset nama toko dan foto profil (opsional)']];
   bukaEdit({
     judul: 'Reset data toko', lbl: 'Reset sekarang', okH: 'Data toko berhasil direset',
     html: `<p class="info">Toko: <b>${esc(nama)}</b>. Data yang dihapus tidak bisa dikembalikan, jadi unduh laporan lebih dulu.</p>
-      <label class="ck"><input type="checkbox" id="rs-all"><b>Reset seluruh data (akun seperti baru)</b></label>` +
+      <label class="ck"><input type="checkbox" id="rs-all"><span><b>Reset seluruh data</b><br><small>Nama toko dan foto profil tetap dipertahankan</small></span></label>` +
       baris.map(([k, t]) => `<label class="ck"><input type="checkbox" data-r="${k}">${t}</label>`).join('') +
       `<p class="info">Menghapus produk atau bahan otomatis ikut mereset transaksi dan resep.</p><label>Ketik nama toko untuk konfirmasi</label><input id="rs-n" autocomplete="off">`,
     hapus: async () => {
@@ -626,9 +626,9 @@ function resetSheet() {
   const sinkron = () => {
     const dep = by('produk').checked || by('bahan').checked;
     ['transaksi', 'resep'].forEach(k => { if (dep) by(k).checked = true; by(k).disabled = dep; });
-    all.checked = cks.every(c => c.checked);
+    all.checked = cks.filter(c => c.dataset.r !== 'profil').every(c => c.checked);
   };
-  all.onchange = () => { cks.forEach(c => { c.checked = all.checked; }); sinkron(); };
+  all.onchange = () => { cks.filter(c => c.dataset.r !== 'profil').forEach(c => { c.checked = all.checked; }); sinkron(); };
   cks.forEach(c => { c.onchange = sinkron; });
 }
 
