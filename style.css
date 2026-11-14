@@ -105,6 +105,8 @@ nav button.on svg{stroke-width:1.8}
 .biglogo{height:96px;width:auto;display:block;margin:0 auto 14px}
 .hl{display:flex;align-items:center;gap:10px;min-width:0}
 .hlogo{height:34px;width:auto;flex:none}
+#login{position:relative}
+#login .gw{position:absolute;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom,0px));margin:0;text-align:center}
 #toko{font-weight:800;font-size:20px;letter-spacing:.2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav button svg{stroke-width:1.8}
 
