@@ -163,3 +163,69 @@ details.pw summary{cursor:pointer;color:#3D5C42;font-weight:600;font-size:14px;p
 .gw i{font-style:normal;font-weight:400}
 
 #pasang{width:100%;margin-top:10px}
+
+/* ===== Reset toko ===== */
+.ck{display:flex;align-items:flex-start;gap:10px;margin:10px 0;font-size:14px;font-weight:400;color:var(--tx)}
+input[type=checkbox]{width:20px;height:20px;padding:0;margin:1px 0 0;flex:none;accent-color:#3D5C42}
+#rst{margin:14px 0 6px}
+
+/* ===== Tampilan baru Beranda ===== */
+body{padding-bottom:104px}
+#app{position:relative;isolation:isolate}
+#app::before{content:'';position:absolute;top:0;left:0;right:0;height:330px;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 70% 90% at 100% 0%,rgba(111,146,118,.38),transparent 70%),radial-gradient(ellipse 50% 60% at 100% 45%,rgba(210,220,198,.7),transparent 70%)}
+header{background:none;color:#3D5C42;border-radius:0;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 4px}
+.hlogo{height:46px}
+.hb2 b{display:block;font-size:20px;font-weight:800;letter-spacing:4px;color:#3D5C42;line-height:1.1}
+.hb2 small{display:block;font-size:12px;color:#4f6b58;margin-top:2px}
+#prof{background:#fff;border:0;box-shadow:0 2px 10px rgba(31,45,34,.18)}
+#av{background-color:#3D5C42}
+#tokobar{margin-bottom:10px}
+#toko{color:#3D5C42;font-size:22px}
+#pilih{width:auto;max-width:100%;margin:0 0 12px;padding:8px 14px;border:0;border-radius:999px;background:#EEEDE9;font-weight:700;font-size:13px;color:#3D5C42}
+.hi2 small{color:#4f6b58;font-size:16px}
+.hi2 h2{margin:2px 0 10px;font-size:32px;font-weight:800;color:#2b3a2e;line-height:1.15}
+.tgb{background:none;padding:6px 0;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#2b3a2e}
+.tgb svg{width:19px;height:19px;fill:none;stroke:#3D5C42;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.fc{display:flex;gap:10px;align-items:flex-start;border-radius:18px;padding:13px;position:relative;overflow:hidden;border:1px solid #E1EAD9}
+.fc::after{content:'';position:absolute;right:-22px;bottom:-26px;width:120px;height:84px;border-radius:50%;background:rgba(61,92,66,.10)}
+.fc.g{background:linear-gradient(135deg,#F1F5EC,#DEE8D6)}
+.fc.o{background:linear-gradient(135deg,#FFF4EC,#FFE6D5);border-color:#FFD9BF}
+.fc.o::after{background:rgba(255,136,69,.13)}
+.fc.bad{background:linear-gradient(135deg,#FDF1EE,#F8DDD6);border-color:#BF5240}
+.fc.bad::after{background:rgba(191,82,64,.10)}
+.fc>div{position:relative;z-index:1;min-width:0}
+.fc small{display:block;color:var(--mu);font-size:12px;margin-bottom:2px}
+.fc b{font-size:16px;word-break:break-word}
+.fc .flag{font-size:11px}
+.fc.bad .flag,.fc.bad b{color:#BF5240}
+.tr{display:block;font-size:12px;font-weight:700;margin-top:4px;color:var(--mu)}
+.tr.ok{color:#2E7D4F}.tr.no{color:#BF5240}
+.cap{font-size:11px;color:var(--mu);margin:-4px 2px 14px}
+.cap2{font-size:11px;color:var(--mu);margin:8px 0 0;text-align:center}
+.ic{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;position:relative;z-index:1}
+.ic svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ic.g{background:#D2DCC4;color:#3D5C42}
+.ic.o{background:#FFD9BF;color:#E8691F}
+.ic.b{background:#F4CFC6;color:#BF5240}
+
+.dc{position:relative}
+.mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.mid b{font-size:12px;color:#2b3a2e}
+.mid small{font-size:9px;color:var(--mu)}
+.lnk{background:#E5EDDF;color:#3D5C42;border:0;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700}
+.sep{height:1px;background:#EEEDE9;margin:12px 0 10px}
+.bl{font-size:13px;margin-bottom:6px}
+.bl2{font-size:13px;text-align:right;margin-top:6px}
+.bl2 span{color:var(--mu)}
+.akt{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EEEDE9;cursor:pointer}
+.akt:last-child{border:0}
+.akt span{flex:1;font-size:14px;font-weight:600;min-width:0}
+.akt small{display:block;color:var(--mu);font-weight:400;font-size:12px;margin-top:2px}
+.akt b{font-size:14px;white-space:nowrap}
+.plus{color:#2E7D4F}.minus{color:#BF5240}
+.btn2.full{width:100%;margin-top:12px}
+
+/* ===== Navbar melayang ===== */
+nav{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));border:0;border-radius:28px;padding:8px;box-shadow:0 8px 28px rgba(31,45,34,.18)}
