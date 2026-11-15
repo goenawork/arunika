@@ -247,7 +247,7 @@ input{border-color:#D9B8DD}
 .lw{position:relative}
 .biglogo{height:100px;margin:0 auto 14px}
 .brand h1{letter-spacing:6px}
-#login .gw{position:absolute;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom,0px));margin:0;text-align:center;font-weight:400}
+#login .gw{position:fixed;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom,0px));margin:0;text-align:center;font-weight:400}
 #login .gw::before{content:'powered by ';font-weight:400}
 #login .gw{font-weight:800}
 #login .gw i{font-weight:400}
@@ -276,3 +276,15 @@ details.pw summary{padding:12px 0}
 .gw2{margin-top:12px;font-size:11px;color:#7a5a80}
 .gw2 b{color:#963396}
 #pasang{margin-top:0}
+
+/* ===== Perbaikan login + Tahap B ===== */
+.lw{z-index:1}
+input:-webkit-autofill,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 100px #fff inset;-webkit-text-fill-color:#3b1f3d;caret-color:#3b1f3d}
+input[type=radio]{width:20px;height:20px;padding:0;margin:2px 0 0;flex:none;accent-color:#963396}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid #E6CFEA;border-radius:14px;padding:12px;margin:8px 0;font-size:13px;font-weight:400;color:var(--tx)}
+.opt small{display:block;color:var(--mu);font-size:11px;margin-top:2px}
+.opt:has(input:checked){border:2px solid #963396;background:#F7ECF7;padding:11px}
+.tag.ok{background:#F3E1F3;color:#963396}
+.tag.dl{background:#EBD3EE;color:#6b2a74}
+.warnbox{background:#FFEAF8;border:1px solid #ED45BB;border-radius:12px;padding:10px;font-size:12px;color:#9b1773;margin:10px 0}
+#cocok h4{margin:14px 0 4px}
