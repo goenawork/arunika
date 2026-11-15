@@ -288,3 +288,6 @@ input[type=radio]{width:20px;height:20px;padding:0;margin:2px 0 0;flex:none;acce
 .tag.dl{background:#EBD3EE;color:#6b2a74}
 .warnbox{background:#FFEAF8;border:1px solid #ED45BB;border-radius:12px;padding:10px;font-size:12px;color:#9b1773;margin:10px 0}
 #cocok h4{margin:14px 0 4px}
+
+/* ===== Navbar selalu di atas konten (ikon aktivitas tidak menimpa) ===== */
+nav{z-index:10}
