@@ -25,7 +25,7 @@ async function enter() {
   const { data: { user } } = await db.auth.getUser();
   const { data } = await db.from('profiles').select('*').eq('id', user.id).single();
   if (!data) { $('#err').textContent = 'Profil akun belum siap, hubungi admin'; return show('login'); }
-  me = data; me.email = user.email;
+  me = data; me.email = user.email; terapkanMenu();
   $('#toko').textContent = me.nama_toko;
   tampilAvatar();
   show('app');
@@ -141,7 +141,7 @@ async function produksi() {
 
   const forms = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
-    : `${tabBar(hasDulu ? ['Daftar produk', 'Resep', 'Catat produksi'] : ['Daftar produk', 'Resep'])}<div class="box pane c3" data-t="2"><h3>Catat produksi</h3>
+    : `${tabBar(hasDulu && ok('mode_dulu') ? ['Daftar produk', 'Resep', 'Catat produksi'] : ['Daftar produk', 'Resep'])}<div class="box pane c3" data-t="2"><h3>Catat produksi</h3>
         <label>Pilih produk</label><select id="pp">${optD}</select>
         <label>Jumlah diproduksi</label><input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
         <label>Tanggal</label><input id="pd" type="date" value="${iso(new Date())}">
@@ -149,7 +149,7 @@ async function produksi() {
       <div class="box pane c1" data-t="0"><h3>Tambah produk</h3>
         <label>Nama produk</label><input id="np" placeholder="Nama produk">
         <label>Harga jual (Rp)</label><input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
-        ${modeCards}<button class="btn" id="sNP">Tambah produk</button></div>
+        ${modeCardsF()}<button class="btn" id="sNP">Tambah produk</button></div>
       <div class="box pane c2" data-t="1"><h3>Isi resep (per 1 produk)</h3>
         <label>Pilih produk</label><select id="rp">${optP}</select>
         <label>Pilih bahan</label><select id="rb">${optB}</select>
@@ -179,7 +179,7 @@ async function produksi() {
   $('#sNP').onclick = async () => {
     const nama = $('#np').value.trim();
     if (!nama || $('#nh').value === '') return toast('Isi nama dan harga jual');
-    const { error } = await db.from('produk').insert({ nama, harga_jual: +$('#nh').value, mode: document.querySelector('input[name=npm]:checked').value });
+    const { error } = await db.from('produk').insert({ nama, harga_jual: +$('#nh').value, mode: (document.querySelector('input[name=npm]:checked') || {}).value });
     if (error) return toast(error.message);
     toast('Produk ditambahkan'); produksi();
   };
@@ -289,11 +289,11 @@ async function stok() {
   const paneProduk = !hasP ? '' : `<div class="box pane c2" data-t="1"><h3>Stok produk (Dibuat dulu)</h3>
     <div class="total">Modal tertahan: ${rp(sumX(produk, x => x.stok * x.hpp_rata))}</div>
     ${produk.map(x => `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('')}</div>`;
-  const paneHS = admin ? '' : `<div class="box pane c3" data-t="${tK}"><h3>Hitung sisa bahan</h3>
+  const paneHS = admin || !ok('koreksi') ? '' : `<div class="box pane c3" data-t="${tK}"><h3>Hitung sisa bahan</h3>
     <div class="note">Isi sisa bahan yang sebenarnya (kosongkan bila tidak dihitung). Selisih dengan hitungan sistem otomatis dicatat sebagai penyesuaian.</div>
     ${bahan.length ? bahan.map(x => `<div class="rl"><span>${esc(x.nama)}<br><small>Sistem: ${+x.stok.toFixed(2)} ${esc(x.satuan)}</small></span><input type="number" step="any" min="0" data-hs="${x.id}" placeholder="Nyata"></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
     <button class="btn" id="sH">Simpan hasil hitung</button></div>`;
-  const paneAdj = admin ? '' : `
+  const paneAdj = admin || !ok('koreksi') ? '' : `
     <div class="box pane c3" data-t="${tK}"><h3>Catat penyesuaian</h3>
       <div class="note">Untuk bahan manual yang terpakai, atau bahan/produk yang rusak, basi, dan dibuang. Stok berkurang dan nilai modalnya tercatat sebagai kerugian.</div>
       <label>Jenis</label>
@@ -309,9 +309,9 @@ async function stok() {
     <div class="box pane c3" data-t="${tK}"><h3>Penyesuaian terakhir</h3>
       ${riwayat.length ? riwayat.map(x => { const n = x.bahan || x.produk; return `<div class="row"${bt('penyesuaian', x.id)}><span>${esc(n?.nama)}<br><small>${x.tanggal} · -${x.qty}${x.bahan ? ' ' + esc(x.bahan.satuan) : ''} · ${esc(x.alasan)}</small></span><b class="neg">${rp(x.nilai)}</b></div>`; }).join('') : '<div class="kosong">Belum ada penyesuaian.</div>'}</div>`;
 
-  $('#view').innerHTML = tabBar(['Stok bahan', ...(hasP ? ['Stok produk'] : []), ...(admin ? [] : ['Koreksi'])]) + paneBahan + paneProduk + paneHS + paneAdj;
+  $('#view').innerHTML = tabBar(['Stok bahan', ...(hasP ? ['Stok produk'] : []), ...(admin || !ok('koreksi') ? [] : ['Koreksi'])]) + paneBahan + paneProduk + paneHS + paneAdj;
   initTabs('stok');
-  if (admin) return;
+  if (admin || !ok('koreksi')) return;
 
   const isi = () => {
     const j = $('#sj').value, arr = j === 'bahan' ? bahan : produk;
@@ -541,7 +541,7 @@ async function aksi(mode) {
 
 // ===== EDIT DATA, BATALKAN TRANSAKSI, BUDGET =====
 const ed = (t, id) => me.role === 'admin' ? '' : ` data-ed="${t}" data-id="${id}"`;
-const bt = (t, id) => me.role === 'admin' ? '' : ` data-bt="${t}" data-id="${id}"`;
+const bt = (t, id) => me.role === 'admin' || !ok('batal') ? '' : ` data-bt="${t}" data-id="${id}"`;
 const ket = e => e.code === '23503' ? 'Tidak bisa dihapus karena sudah dipakai transaksi atau resep. Cukup ubah namanya bila perlu.' : e.message;
 
 function bukaEdit(o) {
@@ -732,6 +732,8 @@ async function home() {
   charts.forEach(c => c.destroy());
   charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? WARNA_M : ['#F3E1F3'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
   $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
+  if (!ok('budget')) { document.querySelectorAll('#view .sep, #view .bl, #view .bl2, #view .prog, #view .box > .flag').forEach(e => e.remove()); const h3 = document.querySelector('#view .box .hd h3'); if (h3) h3.textContent = 'Penjualan'; }
+  if (!ok('laporan') && $('#bl')) $('#bl').remove();
   $('#bs').onclick = aktivitasSheet;
 
   const gambar = () => {
@@ -769,6 +771,7 @@ async function home() {
         ${me.role === 'admin' && tokoFilter !== 'all' ? '<button class="out" id="rst2">Reset data toko ini</button>' : ''}`
     });
     gambar();
+    if (!ok('budget')) document.querySelectorAll('#edf > h4, #edf .prog, #edf > .row, #edf > .flag, #bb2').forEach(e => e.remove());
     if ($('#bb2')) $('#bb2').onclick = () => modalSheet(modalList);
     if ($('#rst2')) $('#rst2').onclick = resetSheet;
   };
@@ -807,4 +810,36 @@ const modeTag = x => x.mode === 'pesan' ? '<span class="tag ok">Dibuat saat dipe
 const modeCards = `<label>Cara pembuatan</label>
   <label class="opt"><input type="radio" name="npm" value="pesan" checked><span><b>Dibuat saat dipesan</b><small>Tanpa stok produk. Bahan berkurang saat produk dijual.</small></span></label>
   <label class="opt"><input type="radio" name="npm" value="dulu"><span><b>Dibuat dulu</b><small>Produksi dulu, stok produk bertambah. Bahan berkurang saat produksi.</small></span></label>`;
-const modeSel = x => `<label>Cara pembuatan</label><select id="e4"${+x.stok > 0 ? ' disabled' : ''}><option value="pesan"${x.mode === 'pesan' ? ' selected' : ''}>Dibuat saat dipesan</option><option value="dulu"${x.mode === 'dulu' ? ' selected' : ''}>Dibuat dulu</option></select>${+x.stok > 0 ? '<p class="info">Tidak bisa diubah selama masih ada stok produk.</p>' : ''}`;
+const modeSel = x => { const op = [['pesan', 'Dibuat saat dipesan'], ['dulu', 'Dibuat dulu']].filter(([k]) => ok('mode_' + k) || x.mode === k); return `<label>Cara pembuatan</label><select id="e4"${+x.stok > 0 ? ' disabled' : ''}>${op.map(([k, t]) => `<option value="${k}"${x.mode === k ? ' selected' : ''}>${t}</option>`).join('')}</select>${+x.stok > 0 ? '<p class="info">Tidak bisa diubah selama masih ada stok produk.</p>' : ''}`; };
+
+// ===== FITUR PER TOKO (diatur admin, ditegakkan database) =====
+const ok = k => !me || me.role === 'admin' || !me.fitur || me.fitur[k] !== false;
+const FITUR = [['Menu', [['m_beli', 'Beli (pembelian bahan, bahan baru)'], ['m_produk', 'Produk (produk, resep, produksi)'], ['m_jual', 'Jual (catat penjualan)'], ['m_stok', 'Stok (stok bahan, koreksi)']]],
+  ['Fitur', [['mode_pesan', 'Produk dibuat saat dipesan'], ['mode_dulu', 'Produk dibuat dulu (produksi, stok produk)'], ['koreksi', 'Koreksi stok (hitung sisa, penyesuaian)'], ['budget', 'Budget bahan baku'], ['laporan', 'Unduh laporan'], ['batal', 'Batalkan transaksi']]]];
+const PAKET = { 'Pedagang pasar': { mode_dulu: false }, 'Toko produksi': { mode_pesan: false }, 'Lengkap': {} };
+const modeCardsF = () => {
+  const op = [['pesan', 'Dibuat saat dipesan', 'Tanpa stok produk. Bahan berkurang saat produk dijual.'], ['dulu', 'Dibuat dulu', 'Produksi dulu, stok produk bertambah. Bahan berkurang saat produksi.']].filter(([k]) => ok('mode_' + k));
+  return op.length ? '<label>Cara pembuatan</label>' + op.map(([k, t, d], i) => `<label class="opt"><input type="radio" name="npm" value="${k}"${i === 0 ? ' checked' : ''}><span><b>${t}</b><small>${d}</small></span></label>`).join('') : '<div class="warnbox">Tidak ada cara pembuatan produk yang aktif untuk toko ini.</div>';
+};
+function terapkanMenu() {
+  [['beli', 'm_beli'], ['produksi', 'm_produk'], ['jual', 'm_jual'], ['stok', 'm_stok']].forEach(([p, k]) => { const b = document.querySelector(`nav [data-p="${p}"]`); if (b) b.hidden = !ok(k); });
+  $('#kelola').hidden = me.role !== 'admin';
+}
+let daftarToko = [];
+async function kelolaToko() {
+  const { data } = await db.from('profiles').select('id,nama_toko,fitur').eq('role', 'toko').order('nama_toko');
+  daftarToko = data || [];
+  bukaEdit({ judul: 'Kelola Toko', html: daftarToko.length ? daftarToko.map(t => { const n = Object.values(t.fitur || {}).filter(v => v === false).length; return `<div class="row" data-kt="${t.id}"><span>${esc(t.nama_toko)}<br><small>${n ? n + ' fitur dinonaktifkan' : 'Semua fitur aktif'}</small></span></div>`; }).join('') : '<div class="kosong">Belum ada akun toko.</div>' });
+}
+function aturToko(id) {
+  const t = daftarToko.find(x => x.id === id), f = t.fitur || {};
+  bukaEdit({
+    judul: 'Fitur: ' + t.nama_toko, ok: 'Fitur toko disimpan',
+    html: `<p class="info">Paket cepat (bisa disesuaikan setelahnya):</p><div class="chips">${Object.keys(PAKET).map(k => `<button type="button" class="lnk" data-pk="${esc(k)}">${esc(k)}</button>`).join('')}</div>` +
+      FITUR.map(([g, arr]) => `<h4>${g}</h4>` + arr.map(([k, l]) => `<label class="ck"><input type="checkbox" data-f="${k}"${f[k] !== false ? ' checked' : ''}>${l}</label>`).join('')).join(''),
+    simpan: async () => { const o = {}; document.querySelectorAll('#edf [data-f]').forEach(c => { o[c.dataset.f] = c.checked; }); const { error } = await db.rpc('atur_fitur', { p_toko: id, p_fitur: o }); return error && error.message; }
+  });
+  document.querySelectorAll('[data-pk]').forEach(b => { b.onclick = () => { const p = PAKET[b.dataset.pk]; document.querySelectorAll('#edf [data-f]').forEach(c => { c.checked = p[c.dataset.f] !== false; }); }; });
+}
+$('#kelola').onclick = () => { $('#sheet').hidden = true; kelolaToko(); };
+$('#edf').addEventListener('click', e => { const r = e.target.closest('[data-kt]'); if (r) aturToko(r.dataset.kt); });
