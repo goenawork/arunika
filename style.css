@@ -291,3 +291,9 @@ input[type=radio]{width:20px;height:20px;padding:0;margin:2px 0 0;flex:none;acce
 
 /* ===== Navbar selalu di atas konten (ikon aktivitas tidak menimpa) ===== */
 nav{z-index:10}
+
+/* ===== Kelola Toko ===== */
+.row[data-kt]{cursor:pointer}
+.row[data-kt]::after{content:'\203A';color:#BC87BC;font-size:22px;margin-left:10px;line-height:1}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+#kelola{width:100%;margin:0 0 10px}
