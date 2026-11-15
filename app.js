@@ -127,26 +127,29 @@ async function produksi() {
     return x.order(ord.c, ord.opt || {});
   };
   const [pr, bh, rs, hs] = await Promise.all([
-    f('produk', 'id,nama,harga_jual,stok,hpp_rata', { c: 'nama' }),
+    f('produk', 'id,nama,harga_jual,stok,hpp_rata,mode', { c: 'nama' }),
     f('bahan', 'id,nama,satuan', { c: 'nama' }, ['tipe', 'otomatis']),
-    f('resep', 'produk_id,takaran,bahan(nama,satuan)', { c: 'produk_id' }),
+    f('resep', 'produk_id,takaran,bahan(nama,satuan,harga_rata)', { c: 'produk_id' }),
     f('produksi', 'id,tanggal,qty,hpp_satuan,produk(nama)', { c: 'created_at', opt: { ascending: false } }).limit(10)
   ]);
   const produk = pr.data || [], bahan = bh.data || [], resep = rs.data || [], riwayat = hs.data || [];
   const optP = produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join('') : '<option value="">Tambah produk dulu</option>';
+  const dulu = produk.filter(x => x.mode === 'dulu'), hasDulu = dulu.length > 0;
+  const optD = hasDulu ? dulu.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join('') : '<option value="">Belum ada produk Dibuat dulu</option>';
+  const modalP = x => x.mode === 'pesan' ? resep.filter(y => y.produk_id === x.id).reduce((t, y) => t + y.takaran * (y.bahan?.harga_rata || 0), 0) : x.hpp_rata;
   const optB = bahan.length ? bahan.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.satuan)})</option>`).join('') : '<option value="">Belum ada bahan tipe Otomatis</option>';
 
   const forms = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
-    : `${tabBar(['Daftar produk', 'Resep', 'Catat produksi'])}<div class="box pane c3" data-t="2"><h3>Catat produksi</h3>
-        <label>Pilih produk</label><select id="pp">${optP}</select>
+    : `${tabBar(hasDulu ? ['Daftar produk', 'Resep', 'Catat produksi'] : ['Daftar produk', 'Resep'])}<div class="box pane c3" data-t="2"><h3>Catat produksi</h3>
+        <label>Pilih produk</label><select id="pp">${optD}</select>
         <label>Jumlah diproduksi</label><input id="pq" type="number" inputmode="decimal" step="any" min="0" placeholder="Jumlah diproduksi">
         <label>Tanggal</label><input id="pd" type="date" value="${iso(new Date())}">
         <button class="btn" id="sP">Simpan produksi</button></div>
       <div class="box pane c1" data-t="0"><h3>Tambah produk</h3>
         <label>Nama produk</label><input id="np" placeholder="Nama produk">
         <label>Harga jual (Rp)</label><input id="nh" type="number" inputmode="numeric" min="0" placeholder="Harga jual (Rp)">
-        <button class="btn" id="sNP">Tambah produk</button></div>
+        ${modeCards}<button class="btn" id="sNP">Tambah produk</button></div>
       <div class="box pane c2" data-t="1"><h3>Isi resep (per 1 produk)</h3>
         <label>Pilih produk</label><select id="rp">${optP}</select>
         <label>Pilih bahan</label><select id="rb">${optB}</select>
@@ -157,7 +160,7 @@ async function produksi() {
     <div class="box pane c1" data-t="0"><h3>Produk dan resep</h3>
       ${produk.length ? produk.map(x => {
         const r = resep.filter(y => y.produk_id === x.id).map(y => `${y.takaran} ${esc(y.bahan?.satuan)} ${esc(y.bahan?.nama)}`).join(', ');
-        return `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}<br>Resep: ${r || 'belum diisi'}</small></span><b>${+x.stok.toFixed(2)}</b></div>`;
+        return `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${tagMargin({ ...x, hpp_rata: modalP(x) })}${modeTag(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(modalP(x))}<br>Resep: ${r || 'belum diisi'}</small></span><b>${x.mode === 'pesan' ? '' : +x.stok.toFixed(2)}</b></div>`;
       }).join('') : '<div class="kosong">Belum ada produk.</div>'}
     </div>
     <div class="box pane c3" data-t="2"><h3>Produksi terakhir</h3>
@@ -176,7 +179,7 @@ async function produksi() {
   $('#sNP').onclick = async () => {
     const nama = $('#np').value.trim();
     if (!nama || $('#nh').value === '') return toast('Isi nama dan harga jual');
-    const { error } = await db.from('produk').insert({ nama, harga_jual: +$('#nh').value });
+    const { error } = await db.from('produk').insert({ nama, harga_jual: +$('#nh').value, mode: document.querySelector('input[name=npm]:checked').value });
     if (error) return toast(error.message);
     toast('Produk ditambahkan'); produksi();
   };
@@ -201,29 +204,25 @@ function initTabs(key) {
     ps.forEach(p => p.hidden = +p.dataset.t !== i);
   };
   bs.forEach(b => b.onclick = () => go(+b.dataset.i));
-  go(tabAktif[key] || 0);
+  go(Math.min(tabAktif[key] || 0, bs.length - 1));
 }
 
 // ===== Halaman JUAL (catat penjualan) =====
 async function jual() {
   charts.forEach(c => c.destroy()); charts = [];
   const admin = me.role === 'admin';
-  const f = (t, k, c, opt) => {
-    let x = db.from(t).select(k);
-    if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter);
-    return x.order(c, opt || {});
-  };
-  const [pr, hs] = await Promise.all([
-    f('produk', 'id,nama,harga_jual,stok', 'nama'),
+  const f = (t, k, c, opt) => { let x = db.from(t).select(k); if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter); return x.order(c, opt || {}); };
+  const [pr, rs, hs] = await Promise.all([
+    f('produk', 'id,nama,harga_jual,stok,mode', 'nama'),
+    f('resep', 'produk_id,takaran,bahan(id,nama,satuan,stok)', 'produk_id'),
     f('penjualan', 'id,tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)', 'created_at', { ascending: false }).limit(15)
   ]);
-  const produk = pr.data || [], riwayat = hs.data || [];
-
+  const produk = pr.data || [], resep = rs.data || [], riwayat = hs.data || [];
   const form = admin
     ? '<div class="note">Akun admin hanya untuk melihat. Untuk input, masuk dengan akun toko.</div>'
     : `<div class="box pane c1"><h3>Catat penjualan</h3>
         <label>Pilih produk</label>
-        <select id="jp">${produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)} (stok ${+x.stok.toFixed(2)})</option>`).join('') : '<option value="">Belum ada produk</option>'}</select>
+        <select id="jp">${produk.length ? produk.map(x => `<option value="${x.id}">${esc(x.nama)} (${x.mode === 'pesan' ? 'dibuat saat dipesan' : 'stok ' + +x.stok.toFixed(2)})</option>`).join('') : '<option value="">Belum ada produk</option>'}</select>
         <label>Jumlah terjual</label>
         <input id="jq" type="number" inputmode="decimal" step="any" min="0" placeholder="Contoh: 3">
         <label>Harga satuan (Rp)</label>
@@ -233,6 +232,7 @@ async function jual() {
         <label>Tanggal</label>
         <input id="jd" type="date" value="${iso(new Date())}">
         <div class="total" id="jt">Total: Rp0</div>
+        <div id="cocok"></div>
         <button class="btn" id="sJ">Simpan penjualan</button></div>`;
 
   $('#view').innerHTML = form + `
@@ -241,16 +241,26 @@ async function jual() {
     </div>`;
   if (admin) return;
 
-  const hitung = () => { $('#jt').textContent = 'Total: ' + rp((+$('#jq').value || 0) * (+$('#jh').value || 0)); };
+  const cocok = () => {
+    const p = produk.find(y => y.id === $('#jp').value), q = +$('#jq').value || 0, el = $('#cocok');
+    if (!p || p.mode !== 'pesan') { el.innerHTML = ''; return; }
+    const rr = resep.filter(y => y.produk_id === p.id);
+    if (!rr.length) { el.innerHTML = '<div class="warnbox">Resep produk ini belum diisi. Isi dulu di menu Produk.</div>'; return; }
+    const rows = rr.map(y => { const need = y.takaran * q, st = +y.bahan.stok; return { n: y.bahan.nama, u: y.bahan.satuan, need, st, kurang: need - st }; });
+    const kr = rows.filter(r => q > 0 && r.kurang > 0);
+    el.innerHTML = '<h4>Pencocokan bahan baku</h4>' + rows.map(r => `<div class="row"><span>${esc(r.n)}<br><small>butuh ${+r.need.toFixed(2)} ${esc(r.u)} | stok ${+r.st.toFixed(2)}</small></span><span class="tag ${q > 0 && r.kurang > 0 ? 'warn' : 'ok'}">${q > 0 && r.kurang > 0 ? 'Kurang ' + +r.kurang.toFixed(2) : 'Cukup'}</span></div>`).join('')
+      + (kr.length ? `<div class="warnbox">Penjualan tetap bisa disimpan. Stok ${kr.map(r => esc(r.n)).join(', ')} akan minus sampai pembelian dicatat.</div>` : '');
+  };
+  const hitung = () => { $('#jt').textContent = 'Total: ' + rp((+$('#jq').value || 0) * (+$('#jh').value || 0)); cocok(); };
   const pilih = () => { const x = produk.find(y => y.id === $('#jp').value); $('#jh').value = x ? x.harga_jual : ''; hitung(); };
   $('#jp').onchange = pilih; $('#jq').oninput = hitung; $('#jh').oninput = hitung; pilih();
 
   $('#sJ').onclick = async () => {
     const qty = +$('#jq').value;
     if (!$('#jp').value || qty <= 0 || $('#jh').value === '') return toast('Pilih produk, isi jumlah dan harga');
-    const { error } = await db.rpc('catat_penjualan', { p_produk: $('#jp').value, p_qty: qty, p_metode: $('#jm').value, p_harga: +$('#jh').value, p_tanggal: $('#jd').value });
+    const { data: kur, error } = await db.rpc('catat_penjualan', { p_produk: $('#jp').value, p_qty: qty, p_metode: $('#jm').value, p_harga: +$('#jh').value, p_tanggal: $('#jd').value });
     if (error) return toast(error.message);
-    toast('Penjualan tersimpan'); jual();
+    toast(kur ? 'Tersimpan. Stok minus: ' + kur : 'Penjualan tersimpan'); jual();
   };
 }
 
@@ -263,31 +273,31 @@ const tagMargin = x => (x.hpp_rata <= 0 || x.harga_jual <= 0) ? ''
 async function stok() {
   charts.forEach(c => c.destroy()); charts = [];
   const admin = me.role === 'admin';
-  const f = (t, k, c, opt) => {
-    let x = db.from(t).select(k);
-    if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter);
-    return x.order(c, opt || {});
-  };
+  const f = (t, k, c, opt) => { let x = db.from(t).select(k); if (tokoFilter !== 'all') x = x.eq('toko_id', tokoFilter); return x.order(c, opt || {}); };
   const [b, p, h] = await Promise.all([
     f('bahan', 'id,nama,satuan,tipe,stok,harga_rata', 'nama'),
-    f('produk', 'id,nama,harga_jual,stok,hpp_rata', 'nama'),
+    f('produk', 'id,nama,harga_jual,stok,hpp_rata,mode', 'nama'),
     f('penyesuaian', 'id,tanggal,qty,nilai,alasan,bahan(nama,satuan),produk(nama)', 'created_at', { ascending: false }).limit(10)
   ]);
-  const bahan = b.data || [], produk = p.data || [], riwayat = h.data || [];
-  const sum = (a, fn) => a.reduce((s, r) => s + fn(r), 0);
+  const bahan = b.data || [], produk = (p.data || []).filter(x => x.mode === 'dulu'), riwayat = h.data || [];
+  const hasP = produk.length > 0, tK = hasP ? 2 : 1;
   const habis = x => x.stok <= 0 ? '<span class="tag warn">Habis</span>' : '';
 
   const paneBahan = `<div class="box pane c1" data-t="0"><h3>Stok bahan</h3>
-    <div class="total">Nilai persediaan: ${rp(sum(bahan, x => x.stok * x.harga_rata))}</div>
+    <div class="total">Nilai persediaan: ${rp(sumX(bahan, x => x.stok * x.harga_rata))}</div>
     ${bahan.length ? bahan.map(x => `<div class="row"${ed('bahan', x.id)}><span>${esc(x.nama)}${habis(x)}<br><small>${x.tipe} · ${rp(x.harga_rata)}/${esc(x.satuan)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}</div>`;
-  const paneProduk = `<div class="box pane c2" data-t="1"><h3>Stok produk (belum terjual)</h3>
-    <div class="total">Modal tertahan: ${rp(sum(produk, x => x.stok * x.hpp_rata))}</div>
-    ${produk.length ? produk.map(x => `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}</div>`;
+  const paneProduk = !hasP ? '' : `<div class="box pane c2" data-t="1"><h3>Stok produk (Dibuat dulu)</h3>
+    <div class="total">Modal tertahan: ${rp(sumX(produk, x => x.stok * x.hpp_rata))}</div>
+    ${produk.map(x => `<div class="row"${ed('produk', x.id)}><span>${esc(x.nama)}${habis(x)}${tagMargin(x)}<br><small>Jual ${rp(x.harga_jual)} · Modal ${rp(x.hpp_rata)}</small></span><b class="${x.stok <= 0 ? 'neg' : ''}">${+x.stok.toFixed(2)}</b></div>`).join('')}</div>`;
+  const paneHS = admin ? '' : `<div class="box pane c3" data-t="${tK}"><h3>Hitung sisa bahan</h3>
+    <div class="note">Isi sisa bahan yang sebenarnya (kosongkan bila tidak dihitung). Selisih dengan hitungan sistem otomatis dicatat sebagai penyesuaian.</div>
+    ${bahan.length ? bahan.map(x => `<div class="rl"><span>${esc(x.nama)}<br><small>Sistem: ${+x.stok.toFixed(2)} ${esc(x.satuan)}</small></span><input type="number" step="any" min="0" data-hs="${x.id}" placeholder="Nyata"></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
+    <button class="btn" id="sH">Simpan hasil hitung</button></div>`;
   const paneAdj = admin ? '' : `
-    <div class="box pane c3" data-t="2"><h3>Catat penyesuaian</h3>
+    <div class="box pane c3" data-t="${tK}"><h3>Catat penyesuaian</h3>
       <div class="note">Untuk bahan manual yang terpakai, atau bahan/produk yang rusak, basi, dan dibuang. Stok berkurang dan nilai modalnya tercatat sebagai kerugian.</div>
       <label>Jenis</label>
-      <select id="sj"><option value="bahan">Bahan baku</option><option value="produk">Produk jadi</option></select>
+      <select id="sj"><option value="bahan">Bahan baku</option>${hasP ? '<option value="produk">Produk jadi</option>' : ''}</select>
       <label>Pilih item</label><select id="si"></select>
       <label>Jumlah yang berkurang</label>
       <input id="sq" type="number" inputmode="decimal" step="any" min="0" placeholder="Contoh: 2">
@@ -296,10 +306,10 @@ async function stok() {
       <label>Tanggal</label>
       <input id="sd" type="date" value="${iso(new Date())}">
       <button class="btn" id="sS">Simpan penyesuaian</button></div>
-    <div class="box pane c3" data-t="2"><h3>Penyesuaian terakhir</h3>
+    <div class="box pane c3" data-t="${tK}"><h3>Penyesuaian terakhir</h3>
       ${riwayat.length ? riwayat.map(x => { const n = x.bahan || x.produk; return `<div class="row"${bt('penyesuaian', x.id)}><span>${esc(n?.nama)}<br><small>${x.tanggal} · -${x.qty}${x.bahan ? ' ' + esc(x.bahan.satuan) : ''} · ${esc(x.alasan)}</small></span><b class="neg">${rp(x.nilai)}</b></div>`; }).join('') : '<div class="kosong">Belum ada penyesuaian.</div>'}</div>`;
 
-  $('#view').innerHTML = tabBar(admin ? ['Stok bahan', 'Stok produk'] : ['Stok bahan', 'Stok produk', 'Penyesuaian']) + paneBahan + paneProduk + paneAdj;
+  $('#view').innerHTML = tabBar(['Stok bahan', ...(hasP ? ['Stok produk'] : []), ...(admin ? [] : ['Koreksi'])]) + paneBahan + paneProduk + paneHS + paneAdj;
   initTabs('stok');
   if (admin) return;
 
@@ -318,6 +328,13 @@ async function stok() {
     const { error } = await db.rpc('catat_penyesuaian', { p_qty: qty, p_alasan: alasan, p_bahan: j === 'bahan' ? id : null, p_produk: j === 'produk' ? id : null, p_tanggal: $('#sd').value });
     if (error) return toast(error.message);
     toast('Penyesuaian tersimpan'); stok();
+  };
+  $('#sH').onclick = async () => {
+    const items = [...document.querySelectorAll('[data-hs]')].filter(i => i.value !== '').map(i => ({ id: i.dataset.hs, nyata: +i.value }));
+    if (!items.length) return toast('Isi minimal satu bahan');
+    const { data, error } = await db.rpc('hitung_sisa', { p_item: items });
+    if (error) return toast(error.message);
+    toast(data > 0 ? `Selisih ${rp(data)} dicatat sebagai kerugian` : 'Stok sesuai, tidak ada kerugian'); stok();
   };
 }
 
@@ -559,14 +576,14 @@ async function editData(tipe, id) {
       hapus: async () => { const { error } = await db.from('bahan').delete().eq('id', id); return error && ket(error); }
     });
   }
-  const [{ data: x }, { data: rs }] = await Promise.all([db.from('produk').select('nama,harga_jual').eq('id', id).single(), db.from('resep').select('id,takaran,bahan(nama,satuan)').eq('produk_id', id)]);
+  const [{ data: x }, { data: rs }] = await Promise.all([db.from('produk').select('nama,harga_jual,mode,stok').eq('id', id).single(), db.from('resep').select('id,takaran,bahan(nama,satuan)').eq('produk_id', id)]);
   bukaEdit({
     judul: 'Ubah produk', ok: 'Produk diperbarui', lbl: 'Hapus produk',
-    html: `<label>Nama produk</label><input id="e1" value="${esc(x.nama)}"><label>Harga jual (Rp)</label><input id="e2" type="number" inputmode="numeric" min="0" value="${x.harga_jual}">` +
+    html: `<label>Nama produk</label><input id="e1" value="${esc(x.nama)}"><label>Harga jual (Rp)</label><input id="e2" type="number" inputmode="numeric" min="0" value="${x.harga_jual}">${modeSel(x)}` +
       ((rs || []).length ? '<h4>Resep (takaran per 1 produk)</h4>' + rs.map(r => `<div class="rl"><span>${esc(r.bahan?.nama)} (${esc(r.bahan?.satuan)})</span><input type="number" step="any" min="0" value="${r.takaran}" data-rid="${r.id}"><button data-rdel="${r.id}" aria-label="Hapus">&times;</button></div>`).join('') : ''),
     simpan: async () => {
       const n = $('#e1').value.trim(); if (!n || $('#e2').value === '') return 'Isi nama dan harga jual';
-      let { error } = await db.from('produk').update({ nama: n, harga_jual: +$('#e2').value }).eq('id', id); if (error) return ket(error);
+      let { error } = await db.from('produk').update({ nama: n, harga_jual: +$('#e2').value, ...(+x.stok > 0 ? {} : { mode: $('#e4').value }) }).eq('id', id); if (error) return ket(error);
       for (const i of document.querySelectorAll('[data-rid]')) { const t = +i.value; if (t > 0) { ({ error } = await db.from('resep').update({ takaran: t }).eq('id', i.dataset.rid)); if (error) return ket(error); } }
       return null;
     },
@@ -660,10 +677,11 @@ async function home() {
   const flt = x => tokoFilter !== 'all' ? x.eq('toko_id', tokoFilter) : x;
   const q = (t, k) => flt(db.from(t).select(k).gte('tanggal', awal));
   const lat = (t, k) => flt(db.from(t).select(k)).order('created_at', { ascending: false }).limit(5);
-  const [j, b, p, m, aj, ab] = await Promise.all([
+  const [j, b, p, m, aj, ab, bb] = await Promise.all([
     q('penjualan', 'tanggal,qty,harga_satuan,hpp_satuan,metode,produk(nama)'), q('pembelian', 'tanggal,total_harga,metode'),
-    flt(db.from('produk').select('nama,stok')), flt(db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', bulanAwal)),
-    lat('penjualan', 'id,qty,harga_satuan,created_at,produk(nama)'), lat('pembelian', 'id,total_harga,created_at,bahan(nama)')
+    flt(db.from('produk').select('nama,stok').eq('mode', 'dulu')), flt(db.from('modal').select('id,tanggal,jumlah,catatan').gte('tanggal', bulanAwal)),
+    lat('penjualan', 'id,qty,harga_satuan,created_at,produk(nama)'), lat('pembelian', 'id,total_harga,created_at,bahan(nama)'),
+    flt(db.from('bahan').select('nama,satuan,stok').order('stok', { ascending: true }).limit(6))
   ]);
   const jual = j.data || [], beli = b.data || [], produk = p.data || [], modalList = m.data || [], sum = sumX;
   const masukR = r => r.qty * r.harga_satuan, labaR = r => r.qty * (r.harga_satuan - r.hpp_satuan);
@@ -705,7 +723,10 @@ async function home() {
       ${terjualList.length ? terjualList.map(([n, v]) => `<div class="row"><span>${esc(n)}<br><small>${rp(v.t)}</small></span><b>${+v.q.toFixed(2)}</b></div>`).join('') : '<div class="kosong">Belum ada penjualan pada tanggal ini.</div>'}
     </div>
     <div class="box"><h3>Sisa produk belum terjual</h3>
-      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk.</div>'}
+      ${produk.length ? produk.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b>${x.stok}</b></div>`).join('') : '<div class="kosong">Belum ada produk yang Dibuat dulu.</div>'}
+    </div>
+    <div class="box"><h3>Bahan baku tersisa</h3>
+      ${(bb.data || []).length ? bb.data.map(x => `<div class="row"><span>${esc(x.nama)}${x.stok <= 0 ? '<span class="tag warn">Habis</span>' : ''}</span><b class="${x.stok < 0 ? 'neg' : ''}">${+(+x.stok).toFixed(2)} ${esc(x.satuan)}</b></div>`).join('') : '<div class="kosong">Belum ada bahan.</div>'}
     </div>`;
 
   charts.forEach(c => c.destroy());
@@ -780,3 +801,10 @@ function isiSidebar() {
   $('#si-status').textContent = navigator.onLine ? '\u25CF Terhubung' : '\u25CF Offline';
   $('#pn').value = me.nama_toko;
 }
+
+// ===== TAHAP B: cara pembuatan produk =====
+const modeTag = x => x.mode === 'pesan' ? '<span class="tag ok">Dibuat saat dipesan</span>' : '<span class="tag dl">Dibuat dulu</span>';
+const modeCards = `<label>Cara pembuatan</label>
+  <label class="opt"><input type="radio" name="npm" value="pesan" checked><span><b>Dibuat saat dipesan</b><small>Tanpa stok produk. Bahan berkurang saat produk dijual.</small></span></label>
+  <label class="opt"><input type="radio" name="npm" value="dulu"><span><b>Dibuat dulu</b><small>Produksi dulu, stok produk bertambah. Bahan berkurang saat produksi.</small></span></label>`;
+const modeSel = x => `<label>Cara pembuatan</label><select id="e4"${+x.stok > 0 ? ' disabled' : ''}><option value="pesan"${x.mode === 'pesan' ? ' selected' : ''}>Dibuat saat dipesan</option><option value="dulu"${x.mode === 'dulu' ? ' selected' : ''}>Dibuat dulu</option></select>${+x.stok > 0 ? '<p class="info">Tidak bisa diubah selama masih ada stok produk.</p>' : ''}`;
