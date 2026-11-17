@@ -1,13 +1,12 @@
 // Konfigurasi Supabase ada di config.js
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif"; Chart.defaults.color = '#7a5a80';
+Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif";
 const $ = s => document.querySelector(s);
 const rp = n => 'Rp' + Math.round(n || 0).toLocaleString('id-ID');
 const iso = d => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD (waktu lokal)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const METODE = ['cash', 'qris', 'transfer'];
-const HIJAU = ['#963396', '#BC87BC', '#EBD3EE'];
 let me = null, tokoFilter = 'all', charts = [];
 
 function show(id) { $('#login').hidden = id !== 'login'; $('#app').hidden = id !== 'app'; }
@@ -25,7 +24,7 @@ async function enter() {
   const { data: { user } } = await db.auth.getUser();
   const { data } = await db.from('profiles').select('*').eq('id', user.id).single();
   if (!data) { $('#err').textContent = 'Profil akun belum siap, hubungi admin'; return show('login'); }
-  me = data; me.email = user.email; terapkanMenu();
+  me = data; me.email = user.email; terapkanMenu(); applyTema(me.tema || 'lilac');
   $('#toko').textContent = me.nama_toko;
   tampilAvatar();
   show('app');
@@ -381,7 +380,7 @@ $('#fto').onchange = async e => {
 };
 
 // ===== BERANDA (dashboard) =====
-const WARNA_M = ['#963396', '#C8A2C8', '#ED45BB'], NAMA_M = ['Cash', 'QRIS', 'Transfer'];
+const NAMA_M = ['Cash', 'QRIS', 'Transfer'];
 let periodeGrafik = 'hari', tglDash = iso(new Date());
 function rentangDash(p) {
   const t = new Date(), e = iso(t);
@@ -477,31 +476,32 @@ function susun(d) {
 
 async function buatPDF(sp) {
   for (const u of LIB.pdf) await muat(u);
+  const C = { p1: rgbv('--p1'), t1: rgbv('--t1'), t2: rgbv('--t2'), mu: rgbv('--mu'), tx: rgbv('--tx'), bd: rgbv('--dg'), bdt: rgbv('--dg-t') };
   const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210;
-  doc.setFillColor(150, 51, 150); doc.rect(0, 0, W, 36, 'F');
+  doc.setFillColor(...C.p1); doc.rect(0, 0, W, 36, 'F');
   doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.text(sp.toko, 14, 16);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(235, 211, 238);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(...C.t2);
   doc.text(sp.judul, 14, 24); doc.text(sp.label, 14, 30);
   let y = 44;
   sp.kartu.forEach((k, i) => {
     const x = 14 + (i % 2) * 94; if (i && i % 2 === 0) y += 25;
-    doc.setFillColor(...(k.bad ? [252, 228, 234] : [243, 225, 243])); doc.setDrawColor(...(k.bad ? [179, 18, 63] : [235, 211, 238]));
+    doc.setFillColor(...(k.bad ? [...C.bdt] : [...C.t1])); doc.setDrawColor(...(k.bad ? [...C.bd] : [...C.t2]));
     doc.roundedRect(x, y, 88, 21, 3, 3, 'FD');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(122, 90, 128); doc.text(k.l, x + 4, y + 7);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...(k.bad ? [179, 18, 63] : [150, 51, 150]));
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...C.mu); doc.text(k.l, x + 4, y + 7);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...(k.bad ? [...C.bd] : [...C.p1]));
     doc.text(k.t === 'rp' ? rp(k.v) : String(k.v), x + 4, y + 16);
   });
   y += 32;
   sp.tabel.forEach(t => {
     if (y > 265) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(150, 51, 150); doc.text(t.judul, 14, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...C.p1); doc.text(t.judul, 14, y);
     doc.autoTable({
       startY: y + 3, head: [t.head], theme: 'striped', margin: { left: 14, right: 14 },
       body: t.body.map(r => r.map((v, i) => t.tipe[i] === 'rp' ? rp(v) : t.tipe[i] === 'tgl' ? fmt(v) : String(v ?? ''))),
-      styles: { fontSize: 10, cellPadding: 2.6, textColor: [59, 31, 61] }, headStyles: { fillColor: [150, 51, 150], textColor: 255 },
-      alternateRowStyles: { fillColor: [243, 225, 243] },
+      styles: { fontSize: 10, cellPadding: 2.6, textColor: [...C.tx] }, headStyles: { fillColor: [...C.p1], textColor: 255 },
+      alternateRowStyles: { fillColor: [...C.t1] },
       columnStyles: Object.fromEntries(t.tipe.map((x, i) => [i, { halign: x === 'rp' ? 'right' : 'left' }])),
-      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [179, 18, 63]; }
+      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [...C.bd]; }
     });
     y = doc.lastAutoTable.finalY + 10;
   });
@@ -666,7 +666,7 @@ const tren = (now, prev, naikBaik) => {
   return `<span class="tr ${(p > 0) === naikBaik ? 'ok' : 'no'}">${p > 0 ? '&uarr; +' : '&darr; '}${p}%</span>`;
 };
 const sumX = (a, f) => a.reduce((s, r) => s + f(r), 0);
-const lgd = arr => { const t = sumX(arr, x => x); return `<div class="lg">${arr.map((v, i) => `<div><i style="background:${WARNA_M[i]}"></i><span>${NAMA_M[i]}<small>${t ? Math.round(v / t * 100) : 0}%</small></span><b>${rp(v)}</b></div>`).join('')}</div>`; };
+const lgd = arr => { const t = sumX(arr, x => x); return `<div class="lg">${arr.map((v, i) => `<div><i style="background:${warnaM()[i]}"></i><span>${NAMA_M[i]}<small>${t ? Math.round(v / t * 100) : 0}%</small></span><b>${rp(v)}</b></div>`).join('')}</div>`; };
 $('#edf').addEventListener('click', e => { const r = e.target.closest('[data-bt]'); if (r && me.role !== 'admin') batalTrx(r.dataset.bt, r.dataset.id, r.innerText.replace(/\n+/g, ' | ')); });
 
 async function home() {
@@ -730,7 +730,7 @@ async function home() {
     </div>`;
 
   charts.forEach(c => c.destroy());
-  charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? WARNA_M : ['#F3E1F3'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
+  charts = [new Chart($('#hc1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: totB ? pmB : [1], backgroundColor: totB ? warnaM() : [cv('--t1')], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '66%', plugins: { legend: { display: false }, tooltip: { enabled: !!totB } } } })];
   $('#tgl').onchange = e => { tglDash = e.target.value || iso(new Date()); home(); };
   if (!ok('budget')) { document.querySelectorAll('#view .sep, #view .bl, #view .bl2, #view .prog, #view .box > .flag').forEach(e => e.remove()); const h3 = document.querySelector('#view .box .hd h3'); if (h3) h3.textContent = 'Penjualan'; }
   if (!ok('laporan') && $('#bl')) $('#bl').remove();
@@ -753,8 +753,8 @@ async function home() {
     }
     chartsD.forEach(c => c.destroy());
     chartsD = [
-      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? WARNA_M : ['#F3E1F3'], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
-      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: '#963396', borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: '#C8A2C8', borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
+      new Chart($('#c1'), { type: 'doughnut', data: { labels: NAMA_M, datasets: [{ data: tot ? pm.map(x => x.masuk) : [1], backgroundColor: tot ? warnaM() : [cv('--t1')], borderWidth: 2, borderColor: '#fff' }] }, options: { cutout: '62%', plugins: { legend: { display: false }, tooltip: { enabled: !!tot } } } }),
+      new Chart($('#c2'), { type: 'bar', data: { labels: lb, datasets: [{ label: 'Pemasukan', backgroundColor: cv('--p1'), borderRadius: 5, data: dm }, { label: 'Pengeluaran', backgroundColor: cv('--p4'), borderRadius: 5, data: dk }] }, options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 13 } } } }, scales: { y: { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v >= 1e3 ? v / 1e3 + 'rb' : v } } } } })
     ];
   };
   $('#bd').onclick = () => {
@@ -803,6 +803,7 @@ function isiSidebar() {
   $('#si-sejak').textContent = me.created_at ? fmt(me.created_at.slice(0, 10)) : '-';
   $('#si-status').textContent = navigator.onLine ? '\u25CF Terhubung' : '\u25CF Offline';
   $('#pn').value = me.nama_toko;
+  isiTema();
 }
 
 // ===== TAHAP B: cara pembuatan produk =====
@@ -843,3 +844,31 @@ function aturToko(id) {
 }
 $('#kelola').onclick = () => { $('#sheet').hidden = true; kelolaToko(); };
 $('#edf').addEventListener('click', e => { const r = e.target.closest('[data-kt]'); if (r) aturToko(r.dataset.kt); });
+
+// ===== TEMA WARNA =====
+const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const warnaM = () => [cv('--c1'), cv('--c2'), cv('--c3')];
+const rgbv = n => { const h = cv(n); return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); };
+const TEMA = [['lilac', 'Lilac', ['#963396', '#BC87BC', '#ED45BB']], ['sage', 'Sage', ['#3D5C42', '#6F9276', '#E8B64A']], ['samudra', 'Samudra', ['#1F4E79', '#5B8DB8', '#F0A030']], ['senja', 'Senja', ['#B5532A', '#E08A5B', '#6B8F71']], ['malam', 'Malam', ['#BC87BC', '#963396', '#ED45BB'], true]];
+function applyTema(t) {
+  if (!TEMA.some(x => x[0] === t && !x[3])) t = 'lilac';
+  document.documentElement.dataset.tema = t;
+  try { localStorage.setItem('tema', t); } catch { /* abaikan */ }
+  document.querySelectorAll('.hlogo,.biglogo').forEach(i => { i.src = t === 'lilac' ? 'logo.png' : `logo-${t}.png`; });
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = cv('--p1');
+  Chart.defaults.color = cv('--mu');
+  return t;
+}
+function isiTema() {
+  const now = document.documentElement.dataset.tema || 'lilac';
+  $('#tgrid').innerHTML = TEMA.map(([k, n, c, soon]) => `<div class="tl${k === now ? ' on' : ''}${soon ? ' soon' : ''}" data-tk="${k}"><div class="sw">${c.map(x => `<i style="background:${x}"></i>`).join('')}</div><b>${n}${soon ? '<em>segera</em>' : ''}</b>${k === now ? '<span class="chk">&#10003;</span>' : ''}</div>`).join('');
+}
+$('#tgrid').addEventListener('click', async e => {
+  const el = e.target.closest('.tl'); if (!el || el.classList.contains('soon')) return;
+  const t = el.dataset.tk; if (t === document.documentElement.dataset.tema) return;
+  const { error } = await db.from('profiles').update({ tema: t }).eq('id', me.id);
+  if (error) return toast('Tema belum bisa disimpan: ' + error.message);
+  me.tema = t; applyTema(t); isiTema(); buka(cur, ''); toast('Tema diganti');
+});
+let temaAwal = 'lilac'; try { temaAwal = localStorage.getItem('tema') || 'lilac'; } catch { /* abaikan */ }
+applyTema(temaAwal);
