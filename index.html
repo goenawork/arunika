@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#82498B">
 <title>ARUNIKA</title>
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.tema=t}catch(e){}</script>
 <link rel="icon" href="logo.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -45,8 +46,8 @@
   <nav>
     <button data-p="home" class="on" aria-label="Beranda"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg><span>Beranda</span></button>
     <button data-p="beli" aria-label="Beli"><svg viewBox="0 0 24 24"><path d="M3 4h2.5l2 11h10.5l2-8H6.5"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span>Beli</span></button>
-    <button data-p="jual" aria-label="Jual"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9.5v.01M18 14.5v.01"/></svg><span>Jual</span></button>
     <button data-p="produksi" aria-label="Produk"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Produk</span></button>
+    <button data-p="jual" aria-label="Jual"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9.5v.01M18 14.5v.01"/></svg><span>Jual</span></button>
     <button data-p="stok" aria-label="Stok"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Stok</span></button>
   </nav>
 </section>
@@ -62,6 +63,8 @@
         <div class="kv"><span>Anggota sejak</span><b id="si-sejak"></b></div>
         <div class="kv"><span>Status data</span><b id="si-status"></b></div>
       </div>
+      <div class="tema-h"><b>Tema warna</b><small>Ketuk untuk mengganti. Tersimpan di akunmu dan berlaku di semua perangkat.</small></div>
+      <div class="tgrid" id="tgrid"></div>
       <details class="pw"><summary>Ubah nama toko dan foto</summary>
         <label class="ganti">Ganti foto<input id="fto" type="file" accept="image/*" hidden></label>
         <label>Nama toko</label><input id="pn" maxlength="40">
