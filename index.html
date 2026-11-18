@@ -63,8 +63,10 @@
         <div class="kv"><span>Anggota sejak</span><b id="si-sejak"></b></div>
         <div class="kv"><span>Status data</span><b id="si-status"></b></div>
       </div>
-      <div class="tema-h"><b>Tema warna</b><small>Ketuk untuk mengganti. Tersimpan di akunmu dan berlaku di semua perangkat.</small></div>
-      <div class="tgrid" id="tgrid"></div>
+      <details class="pw" id="dtema"><summary>Tema warna <span class="tn" id="tnow"></span></summary>
+        <p class="info">Ketuk untuk mengganti. Tersimpan di akunmu dan berlaku di semua perangkat.</p>
+        <div class="tgrid" id="tgrid"></div>
+      </details>
       <details class="pw"><summary>Ubah nama toko dan foto</summary>
         <label class="ganti">Ganti foto<input id="fto" type="file" accept="image/*" hidden></label>
         <label>Nama toko</label><input id="pn" maxlength="40">
