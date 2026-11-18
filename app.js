@@ -471,6 +471,8 @@ function susun(d) {
     sp.tabel.push({ judul: 'Stok produk', head: ['Produk', 'Stok', 'Modal', 'Harga jual', 'Nilai modal'], tipe: ['txt', 'txt', 'rp', 'rp', 'rp'],
       body: produk.map(r => [r.nama, +r.stok.toFixed(2), r.hpp_rata, r.harga_jual, r.stok * r.hpp_rata]) });
   }
+  const SUMCOL = { 'Per metode pembayaran': [1, 2], 'Rekap harian': [1, 2, 3, 4], 'Daftar penjualan': [2, 4, 6], 'Daftar pembelian': [3], 'Stok bahan': [4], 'Stok produk': [4] };
+  sp.tabel.forEach(t => { const ix = SUMCOL[t.judul]; if (ix && t.body.length) t.total = t.head.map((_, i) => i === 0 ? 'TOTAL' : ix.includes(i) ? t.body.reduce((a, r) => a + (+r[i] || 0), 0) : ''); });
   return sp;
 }
 
@@ -501,7 +503,9 @@ async function buatPDF(sp) {
       styles: { fontSize: 10, cellPadding: 2.6, textColor: [...C.tx] }, headStyles: { fillColor: [...C.p1], textColor: 255 },
       alternateRowStyles: { fillColor: [...C.t1] },
       columnStyles: Object.fromEntries(t.tipe.map((x, i) => [i, { halign: x === 'rp' ? 'right' : 'left' }])),
-      didParseCell: c => { if (c.section === 'body' && t.tipe[c.column.index] === 'rp' && t.body[c.row.index][c.column.index] < 0) c.cell.styles.textColor = [...C.bd]; }
+      foot: t.total ? [t.total.map((v, i) => v === '' ? '' : i === 0 ? v : t.tipe[i] === 'rp' ? rp(v) : String(+(+v).toFixed(2)))] : undefined, showFoot: 'lastPage',
+      footStyles: { fillColor: [...C.t2], textColor: [...C.tx], fontStyle: 'bold' },
+      didParseCell: c => { const i = c.column.index; if (t.tipe[i] !== 'rp') return; const v = c.section === 'body' ? t.body[c.row.index][i] : (c.section === 'foot' && t.total ? t.total[i] : 0); if (v < 0) c.cell.styles.textColor = [...C.bd]; }
     });
     y = doc.lastAutoTable.finalY + 10;
   });
@@ -517,7 +521,7 @@ async function buatXLSX(sp) {
   const w0 = XLSX.utils.aoa_to_sheet(ring); w0['!cols'] = [{ wch: 28 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, w0, 'Ringkasan');
   sp.tabel.forEach(t => {
-    const ws = XLSX.utils.aoa_to_sheet([t.head, ...t.body]); ws['!cols'] = t.head.map(() => ({ wch: 20 }));
+    const ws = XLSX.utils.aoa_to_sheet([t.head, ...t.body, ...(t.total ? [t.total] : [])]); ws['!cols'] = t.head.map(() => ({ wch: 20 }));
     XLSX.utils.book_append_sheet(wb, ws, t.judul.slice(0, 30));
   });
   return new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -861,6 +865,8 @@ function applyTema(t) {
 }
 function isiTema() {
   const now = document.documentElement.dataset.tema || 'lilac';
+  const cu = TEMA.find(x => x[0] === now) || TEMA[0];
+  $('#tnow').innerHTML = cu[1] + cu[2].map(x => `<i style="background:${x}"></i>`).join('');
   $('#tgrid').innerHTML = TEMA.map(([k, n, c, soon]) => `<div class="tl${k === now ? ' on' : ''}${soon ? ' soon' : ''}" data-tk="${k}"><div class="sw">${c.map(x => `<i style="background:${x}"></i>`).join('')}</div><b>${n}${soon ? '<em>segera</em>' : ''}</b>${k === now ? '<span class="chk">&#10003;</span>' : ''}</div>`).join('');
 }
 $('#tgrid').addEventListener('click', async e => {
@@ -868,7 +874,7 @@ $('#tgrid').addEventListener('click', async e => {
   const t = el.dataset.tk; if (t === document.documentElement.dataset.tema) return;
   const { error } = await db.from('profiles').update({ tema: t }).eq('id', me.id);
   if (error) return toast('Tema belum bisa disimpan: ' + error.message);
-  me.tema = t; applyTema(t); isiTema(); buka(cur, ''); toast('Tema diganti');
+  me.tema = t; applyTema(t); isiTema(); $('#dtema').open = false; buka(cur, ''); toast('Tema diganti');
 });
 let temaAwal = 'lilac'; try { temaAwal = localStorage.getItem('tema') || 'lilac'; } catch { /* abaikan */ }
 applyTema(temaAwal);
